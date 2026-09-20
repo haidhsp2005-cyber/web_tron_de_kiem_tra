@@ -660,18 +660,41 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
     doc.save(output_path)
     print(f"Standard Math 12 Sample DOCX created at: {output_path}")
 
+def get_unicode_font_paths():
+    """Find available TrueType fonts supporting Vietnamese diacritics across Windows and Linux."""
+    candidates_reg = [
+        "C:/Windows/Fonts/times.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    candidates_bold = [
+        "C:/Windows/Fonts/timesbd.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ]
+    reg_path = next((p for p in candidates_reg if os.path.exists(p)), None)
+    bold_path = next((p for p in candidates_bold if os.path.exists(p)), reg_path)
+    return reg_path, bold_path
+
 def create_sample_pdf_from_docx(docx_path="samples/de_thi_mau_chuan.docx", pdf_path="samples/de_thi_mau_chuan.pdf"):
     """
     Generate matching Math 12 sample PDF with PyMuPDF.
     Page 1: Student exam (clean, 2 choices per line).
     Page 2: Answer key table and grading rubric.
+    Embeds TrueType fonts (CID Type0) for flawless Vietnamese rendering in all PDF viewers.
     """
     import pymupdf
     doc_pdf = pymupdf.open()
     
-    font_regular = "C:/Windows/Fonts/times.ttf" if os.path.exists("C:/Windows/Fonts/times.ttf") else None
-    font_bold = "C:/Windows/Fonts/timesbd.ttf" if os.path.exists("C:/Windows/Fonts/timesbd.ttf") else font_regular
-    font_italic = "C:/Windows/Fonts/timesi.ttf" if os.path.exists("C:/Windows/Fonts/timesi.ttf") else font_regular
+    font_reg_path, font_bold_path = get_unicode_font_paths()
+    fn_reg = "F_REG" if font_reg_path else "helv"
+    fn_bold = "F_BOLD" if font_bold_path else "helv"
     
     c_black = (0, 0, 0)
     c_red = (0.86, 0.15, 0.15)
@@ -680,160 +703,170 @@ def create_sample_pdf_from_docx(docx_path="samples/de_thi_mau_chuan.docx", pdf_p
     
     # ---------------- PAGE 1: EXAM WITH BOLD RED ANSWERS ----------------
     page1 = doc_pdf.new_page(width=595, height=842)
-    page1.insert_text((40, 32), "SỞ GIÁO DỤC VÀ ĐÀO TẠO              KỲ THI THỬ TỐT NGHIỆP THPT NĂM HỌC 2026 - 2027", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((40, 45), "TRƯỜNG THPT LONG CANG               BÀI THI: TOÁN (LỚP 12) - ĐỀ MẪU CÓ ĐÁP ÁN ĐỎ", fontsize=9, fontfile=font_bold, color=c_blue)
+    if font_reg_path:
+        page1.insert_font(fontname=fn_reg, fontfile=font_reg_path)
+    if font_bold_path:
+        page1.insert_font(fontname=fn_bold, fontfile=font_bold_path)
+
+    page1.insert_text((40, 32), "SỞ GIÁO DỤC VÀ ĐÀO TẠO              KỲ THI THỬ TỐT NGHIỆP THPT NĂM HỌC 2026 - 2027", fontsize=9, fontname=fn_bold, color=c_black)
+    page1.insert_text((40, 45), "TRƯỜNG THPT LONG CANG               BÀI THI: TOÁN (LỚP 12) - ĐỀ MẪU CÓ ĐÁP ÁN ĐỎ", fontsize=9, fontname=fn_bold, color=c_blue)
     page1.draw_line((40, 52), (555, 52), color=c_gray, width=0.7)
     
     y = 65
-    page1.insert_text((40, y), "Họ và tên thí sinh: .....................................................................     Lớp: .......................   MÃ ĐỀ: 000", fontsize=9, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Họ và tên thí sinh: .....................................................................     Lớp: .......................   MÃ ĐỀ: 000", fontsize=9, fontname=fn_reg, color=c_black)
     y += 16
     
     # PHẦN I
-    page1.insert_text((40, y), "PHẦN I. Câu trắc nghiệm nhiều phương án lựa chọn (Đáp án đúng in đậm màu đỏ)", fontsize=9.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((40, y), "PHẦN I. Câu trắc nghiệm nhiều phương án lựa chọn (Đáp án đúng in đậm màu đỏ)", fontsize=9.5, fontname=fn_bold, color=c_black)
     y += 13
-    page1.insert_text((40, y), "Câu 1: Hàm số y = f(x) có f'(x) = x(x - 2)(x + 1). Hàm số đồng biến trên khoảng nào?", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Câu 1: Hàm số y = f(x) có f'(x) = x(x - 2)(x + 1). Hàm số đồng biến trên khoảng nào?", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 11
-    page1.insert_text((55, y), "A. (-1; 0).", fontsize=8.5, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "B. (2; +∞).", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "A. (-1; 0).", fontsize=8.5, fontname=fn_bold, color=c_black)
+    page1.insert_text((300, y), "B. (2; +∞).", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 11
-    page1.insert_text((55, y), "C. (0; 2).", fontsize=8.5, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. (-∞; -1).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((55, y), "C. (0; 2).", fontsize=8.5, fontname=fn_bold, color=c_black)
+    page1.insert_text((300, y), "D. (-∞; -1).", fontsize=8.5, fontname=fn_bold, color=c_black)
     y += 14
     
-    page1.insert_text((40, y), "Câu 2: Đồ thị hàm số y = (2x - 1)/(x + 1) có đường tiệm cận đứng là:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Câu 2: Đồ thị hàm số y = (2x - 1)/(x + 1) có đường tiệm cận đứng là:", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 11
-    page1.insert_text((55, y), "A. x = 2.", fontsize=8.5, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "B. x = -1.", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "A. x = 2.", fontsize=8.5, fontname=fn_bold, color=c_black)
+    page1.insert_text((300, y), "B. x = -1.", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 11
-    page1.insert_text((55, y), "C. y = 2.", fontsize=8.5, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. y = -1.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((55, y), "C. y = 2.", fontsize=8.5, fontname=fn_bold, color=c_black)
+    page1.insert_text((300, y), "D. y = -1.", fontsize=8.5, fontname=fn_bold, color=c_black)
     y += 14
 
-    page1.insert_text((40, y), "Câu 3: Điểm cực đại của đồ thị hàm số y = x³ - 3x + 2 là:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Câu 3: Điểm cực đại của đồ thị hàm số y = x³ - 3x + 2 là:", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 11
-    page1.insert_text((55, y), "A. M(1; 0).", fontsize=8.5, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "B. N(-1; 4).", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "A. M(1; 0).", fontsize=8.5, fontname=fn_bold, color=c_black)
+    page1.insert_text((300, y), "B. N(-1; 4).", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 11
-    page1.insert_text((55, y), "C. P(0; 2).", fontsize=8.5, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. Q(2; 4).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((55, y), "C. P(0; 2).", fontsize=8.5, fontname=fn_bold, color=c_black)
+    page1.insert_text((300, y), "D. Q(2; 4).", fontsize=8.5, fontname=fn_bold, color=c_black)
     y += 14
 
-    page1.insert_text((40, y), "Câu 4: Họ nguyên hàm của hàm số f(x) = 3x² + cos x là:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Câu 4: Họ nguyên hàm của hàm số f(x) = 3x² + cos x là:", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 11
-    page1.insert_text((55, y), "A. F(x) = x³ - sin x + C.", fontsize=8.5, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "B. F(x) = x³ + sin x + C.", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "A. F(x) = x³ - sin x + C.", fontsize=8.5, fontname=fn_bold, color=c_black)
+    page1.insert_text((300, y), "B. F(x) = x³ + sin x + C.", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 11
-    page1.insert_text((55, y), "C. F(x) = 6x + sin x + C.", fontsize=8.5, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. F(x) = x³ + cos x + C.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((55, y), "C. F(x) = 6x + sin x + C.", fontsize=8.5, fontname=fn_bold, color=c_black)
+    page1.insert_text((300, y), "D. F(x) = x³ + cos x + C.", fontsize=8.5, fontname=fn_bold, color=c_black)
     y += 14
 
-    page1.insert_text((40, y), "Câu 5: Mặt cầu (S): (x - 1)² + (y + 2)² + (z - 3)² = 16 có tâm I và bán kính R là:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Câu 5: Mặt cầu (S): (x - 1)² + (y + 2)² + (z - 3)² = 16 có tâm I và bán kính R là:", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 11
-    page1.insert_text((55, y), "A. I(1; -2; 3), R = 4.", fontsize=8.5, fontfile=font_bold, color=c_red)
-    page1.insert_text((300, y), "B. I(-1; 2; -3), R = 4.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((55, y), "A. I(1; -2; 3), R = 4.", fontsize=8.5, fontname=fn_bold, color=c_red)
+    page1.insert_text((300, y), "B. I(-1; 2; -3), R = 4.", fontsize=8.5, fontname=fn_bold, color=c_black)
     y += 11
-    page1.insert_text((55, y), "C. I(1; -2; 3), R = 16.", fontsize=8.5, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. I(-1; 2; -3), R = 16.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((55, y), "C. I(1; -2; 3), R = 16.", fontsize=8.5, fontname=fn_bold, color=c_black)
+    page1.insert_text((300, y), "D. I(-1; 2; -3), R = 16.", fontsize=8.5, fontname=fn_bold, color=c_black)
     y += 14
 
-    page1.insert_text((40, y), "Câu 6: Trong không gian Oxyz, cho a⃗ = (1; 2; -1) và b⃗ = (2; 0; 1). Tọa độ u⃗ = a⃗ + 2b⃗ là:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Câu 6: Trong không gian Oxyz, cho vectơ a = (1; 2; -1) và vectơ b = (2; 0; 1). Tọa độ vectơ u = a + 2b là:", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 11
-    page1.insert_text((55, y), "A. u⃗ = (5; 2; 1).", fontsize=8.5, fontfile=font_bold, color=c_red)
-    page1.insert_text((300, y), "B. u⃗ = (3; 2; 0).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((55, y), "A. u = (5; 2; 1).", fontsize=8.5, fontname=fn_bold, color=c_red)
+    page1.insert_text((300, y), "B. u = (3; 2; 0).", fontsize=8.5, fontname=fn_bold, color=c_black)
     y += 11
-    page1.insert_text((55, y), "C. u⃗ = (5; 4; 1).", fontsize=8.5, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. u⃗ = (4; 2; -1).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((55, y), "C. u = (5; 4; 1).", fontsize=8.5, fontname=fn_bold, color=c_black)
+    page1.insert_text((300, y), "D. u = (4; 2; -1).", fontsize=8.5, fontname=fn_bold, color=c_black)
     y += 16
 
     # PHẦN II
-    page1.insert_text((40, y), "PHẦN II. Câu trắc nghiệm đúng sai (Ý Đúng/Sai in đậm màu đỏ)", fontsize=9.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((40, y), "PHẦN II. Câu trắc nghiệm đúng sai (Ý Đúng/Sai in đậm màu đỏ)", fontsize=9.5, fontname=fn_bold, color=c_black)
     y += 13
-    page1.insert_text((40, y), "Câu 1: Cho hàm tổng chi phí C(x) = x³ - 30x² + 400x + 500 (nghìn đồng) với 0 ≤ x ≤ 25:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Câu 1: Cho hàm tổng chi phí C(x) = x³ - 30x² + 400x + 500 (nghìn đồng) với 0 ≤ x ≤ 25:", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 10
-    page1.insert_text((55, y), "a) Chi phí cố định khi x = 0 là 500 nghìn đồng. (Đúng)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "a) Chi phí cố định khi x = 0 là 500 nghìn đồng. (Đúng)", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 10
-    page1.insert_text((55, y), "b) Chi phí biên tại mức sản lượng x = 10 là C'(10) = 100 nghìn đồng. (Đúng)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "b) Chi phí biên tại mức sản lượng x = 10 là C'(10) = 100 nghìn đồng. (Đúng)", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 10
-    page1.insert_text((55, y), "c) Chi phí trung bình luôn giảm khi sản lượng tăng từ 0 đến 25. (Sai)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "c) Chi phí trung bình luôn giảm khi sản lượng tăng từ 0 đến 25. (Sai)", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 10
-    page1.insert_text((55, y), "d) Tổng chi phí sản xuất nhỏ nhất khi x = 20 sản phẩm. (Sai)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "d) Tổng chi phí sản xuất nhỏ nhất khi x = 20 sản phẩm. (Sai)", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 13
 
-    page1.insert_text((40, y), "Câu 2: Trong không gian Oxyz, cho A(1; 0; 2), B(-1; 1; 3), C(3; 2; 1) và (P): 2x - y + 2z - 5 = 0:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Câu 2: Trong không gian Oxyz, cho A(1; 0; 2), B(-1; 1; 3), C(3; 2; 1) và (P): 2x - y + 2z - 5 = 0:", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 10
-    page1.insert_text((55, y), "a) Trọng tâm G của tam giác ABC là G(1; 1; 2). (Đúng)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "a) Trọng tâm G của tam giác ABC là G(1; 1; 2). (Đúng)", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 10
-    page1.insert_text((55, y), "b) Mặt phẳng (P) có vectơ pháp tuyến n⃗ = (2; -1; 2). (Đúng)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "b) Mặt phẳng (P) có vectơ pháp tuyến n = (2; -1; 2). (Đúng)", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 10
-    page1.insert_text((55, y), "c) Điểm A(1; 0; 2) nằm trên mặt phẳng (P). (Sai)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "c) Điểm A(1; 0; 2) nằm trên mặt phẳng (P). (Sai)", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 10
-    page1.insert_text((55, y), "d) Khoảng cách từ O đến mặt phẳng (P) bằng 1. (Sai)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "d) Khoảng cách từ O đến mặt phẳng (P) bằng 1. (Sai)", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 15
 
     # PHẦN III
-    page1.insert_text((40, y), "PHẦN III. Câu trắc nghiệm trả lời ngắn (Đáp án in đậm màu đỏ)", fontsize=9.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((40, y), "PHẦN III. Câu trắc nghiệm trả lời ngắn (Đáp án in đậm màu đỏ)", fontsize=9.5, fontname=fn_bold, color=c_black)
     y += 12
-    page1.insert_text((40, y), "Câu 1: Tìm giá trị lớn nhất của hàm số y = -x² + 4x + 5 trên [0; 3].", fontsize=8.5, fontfile=font_regular, color=c_black)
-    page1.insert_text((370, y), "Đáp án: 9", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((40, y), "Câu 1: Tìm giá trị lớn nhất của hàm số y = -x² + 4x + 5 trên [0; 3].", fontsize=8.5, fontname=fn_reg, color=c_black)
+    page1.insert_text((370, y), "Đáp án: 9", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 12
-    page1.insert_text((40, y), "Câu 2: Tính tích phân I = ∫(2x + 1)dx từ 0 đến 3.", fontsize=8.5, fontfile=font_regular, color=c_black)
-    page1.insert_text((370, y), "Đáp án: 12", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((40, y), "Câu 2: Tính tích phân I = ∫(2x + 1)dx từ 0 đến 3.", fontsize=8.5, fontname=fn_reg, color=c_black)
+    page1.insert_text((370, y), "Đáp án: 12", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 12
-    page1.insert_text((40, y), "Câu 3: Mặt cầu (S) tâm I(1; 1; 2) đi qua A(2; -1; 4) có bán kính R bằng bao nhiêu?", fontsize=8.5, fontfile=font_regular, color=c_black)
-    page1.insert_text((370, y), "Đáp án: 3", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((40, y), "Câu 3: Mặt cầu (S) tâm I(1; 1; 2) đi qua A(2; -1; 4) có bán kính R bằng bao nhiêu?", fontsize=8.5, fontname=fn_reg, color=c_black)
+    page1.insert_text((370, y), "Đáp án: 3", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 15
 
     # PHẦN IV
-    page1.insert_text((40, y), "PHẦN IV. Câu tự luận (Hướng dẫn chấm in đậm màu đỏ)", fontsize=9.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((40, y), "PHẦN IV. Câu tự luận (Hướng dẫn chấm in đậm màu đỏ)", fontsize=9.5, fontname=fn_bold, color=c_black)
     y += 12
-    page1.insert_text((40, y), "Câu 1 (1,5 điểm): Cho hình chóp S.ABCD đáy là hình vuông cạnh a, SA ⊥ (ABCD) và SA = a√3. Tính theo a thể tích V.", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Câu 1 (1,5 điểm): Cho hình chóp S.ABCD có đáy là hình vuông cạnh a, SA vuông góc với (ABCD) và SA = a√3. Tính theo a thể tích V.", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 10
-    page1.insert_text((55, y), "Hướng dẫn chấm: V = (1/3) * a² * a√3 = (a³√3)/3 (1,5 điểm)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "Hướng dẫn chấm: V = (1/3) * a² * a√3 = (a³√3)/3 (1,5 điểm)", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 12
-    page1.insert_text((40, y), "Câu 2 (1,0 điểm): Một ô tô chạy v₀ = 10 m/s đạp phanh với a(t) = -2t (m/s²). Tính quãng đường đến khi dừng hẳn.", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((40, y), "Câu 2 (1,0 điểm): Một ô tô chạy v₀ = 10 m/s đạp phanh với a(t) = -2t (m/s²). Tính quãng đường đến khi dừng hẳn.", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 10
-    page1.insert_text((55, y), "Hướng dẫn chấm: Dừng khi v(t) = 0 <=> t = √10; s = ∫(10 - t²)dt = (20√10)/3 ≈ 21,08 mét (1,0 điểm)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((55, y), "Hướng dẫn chấm: Dừng khi v(t) = 0 <=> t = √10; s = ∫(10 - t²)dt = (20√10)/3 ≈ 21,08 mét (1,0 điểm)", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 16
-    page1.insert_text((220, y), "------------------ HẾT ------------------", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((220, y), "------------------ HẾT ------------------", fontsize=8.5, fontname=fn_bold, color=c_black)
 
     # ---------------- PAGE 2: SEPARATE ANSWER KEY ----------------
     page2 = doc_pdf.new_page(width=595, height=842)
-    page2.insert_text((130, 45), "BẢNG ĐÁP ÁN VÀ HƯỚNG DẪN CHẤM ĐỀ THI MẪU", fontsize=12, fontfile=font_bold, color=c_blue)
-    page2.insert_text((180, 62), "MÔN: TOÁN (LỚP 12) - MÃ ĐỀ: 000", fontsize=10, fontfile=font_bold, color=c_black)
+    if font_reg_path:
+        page2.insert_font(fontname=fn_reg, fontfile=font_reg_path)
+    if font_bold_path:
+        page2.insert_font(fontname=fn_bold, fontfile=font_bold_path)
+
+    page2.insert_text((130, 45), "BẢNG ĐÁP ÁN VÀ HƯỚNG DẪN CHẤM ĐỀ THI MẪU", fontsize=12, fontname=fn_bold, color=c_blue)
+    page2.insert_text((180, 62), "MÔN: TOÁN (LỚP 12) - MÃ ĐỀ: 000", fontsize=10, fontname=fn_bold, color=c_black)
     page2.draw_line((40, 75), (555, 75), color=c_gray, width=0.7)
 
     y2 = 95
-    page2.insert_text((40, y2), "I. BẢNG ĐÁP ÁN PHẦN I (TRẮC NGHIỆM 4 LỰA CHỌN)", fontsize=10, fontfile=font_bold, color=c_black)
+    page2.insert_text((40, y2), "I. BẢNG ĐÁP ÁN PHẦN I (TRẮC NGHIỆM 4 LỰA CHỌN)", fontsize=10, fontname=fn_bold, color=c_black)
     y2 += 16
-    page2.insert_text((55, y2), "Câu 1: B       Câu 2: B       Câu 3: B       Câu 4: B       Câu 5: A       Câu 6: A", fontsize=10, fontfile=font_bold, color=c_red)
+    page2.insert_text((55, y2), "Câu 1: B       Câu 2: B       Câu 3: B       Câu 4: B       Câu 5: A       Câu 6: A", fontsize=10, fontname=fn_bold, color=c_red)
     y2 += 25
 
-    page2.insert_text((40, y2), "II. BẢNG ĐÁP ÁN PHẦN II (TRẮC NGHIỆM ĐÚNG / SAI)", fontsize=10, fontfile=font_bold, color=c_black)
+    page2.insert_text((40, y2), "II. BẢNG ĐÁP ÁN PHẦN II (TRẮC NGHIỆM ĐÚNG / SAI)", fontsize=10, fontname=fn_bold, color=c_black)
     y2 += 16
-    page2.insert_text((55, y2), "Câu 1:   a) Đúng   |   b) Đúng   |   c) Sai   |   d) Sai", fontsize=9.5, fontfile=font_bold, color=c_black)
+    page2.insert_text((55, y2), "Câu 1:   a) Đúng   |   b) Đúng   |   c) Sai   |   d) Sai", fontsize=9.5, fontname=fn_bold, color=c_black)
     y2 += 14
-    page2.insert_text((55, y2), "Câu 2:   a) Đúng   |   b) Đúng   |   c) Sai   |   d) Sai", fontsize=9.5, fontfile=font_bold, color=c_black)
+    page2.insert_text((55, y2), "Câu 2:   a) Đúng   |   b) Đúng   |   c) Sai   |   d) Sai", fontsize=9.5, fontname=fn_bold, color=c_black)
     y2 += 25
 
-    page2.insert_text((40, y2), "III. BẢNG ĐÁP ÁN PHẦN III (TRẢ LỜI NGẮN)", fontsize=10, fontfile=font_bold, color=c_black)
+    page2.insert_text((40, y2), "III. BẢNG ĐÁP ÁN PHẦN III (TRẢ LỜI NGẮN)", fontsize=10, fontname=fn_bold, color=c_black)
     y2 += 16
-    page2.insert_text((55, y2), "Câu 1: 9                Câu 2: 12                Câu 3: 3", fontsize=10, fontfile=font_bold, color=c_red)
+    page2.insert_text((55, y2), "Câu 1: 9                Câu 2: 12                Câu 3: 3", fontsize=10, fontname=fn_bold, color=c_red)
     y2 += 25
 
-    page2.insert_text((40, y2), "IV. HƯỚNG DẪN CHẤM PHẦN IV (TỰ LUẬN)", fontsize=10, fontfile=font_bold, color=c_black)
+    page2.insert_text((40, y2), "IV. HƯỚNG DẪN CHẤM PHẦN IV (TỰ LUẬN)", fontsize=10, fontname=fn_bold, color=c_black)
     y2 += 16
-    page2.insert_text((40, y2), "Câu 1 (1,5 điểm):", fontsize=9.5, fontfile=font_bold, color=c_black)
+    page2.insert_text((40, y2), "Câu 1 (1,5 điểm):", fontsize=9.5, fontname=fn_bold, color=c_black)
     y2 += 13
-    page2.insert_text((55, y2), "• Diện tích đáy: S_ABCD = a² (0,5 điểm). Chiều cao: SA = a√3 (0,5 điểm).", fontsize=9, fontfile=font_regular, color=c_black)
+    page2.insert_text((55, y2), "• Diện tích đáy: S_ABCD = a² (0,5 điểm). Chiều cao: SA = a√3 (0,5 điểm).", fontsize=9, fontname=fn_reg, color=c_black)
     y2 += 12
-    page2.insert_text((55, y2), "• Thể tích: V = (1/3) * a² * a√3 = (a³√3)/3 (0,5 điểm).", fontsize=9, fontfile=font_bold, color=c_red)
+    page2.insert_text((55, y2), "• Thể tích: V = (1/3) * a² * a√3 = (a³√3)/3 (0,5 điểm).", fontsize=9, fontname=fn_bold, color=c_red)
     y2 += 18
 
-    page2.insert_text((40, y2), "Câu 2 (1,0 điểm):", fontsize=9.5, fontfile=font_bold, color=c_black)
+    page2.insert_text((40, y2), "Câu 2 (1,0 điểm):", fontsize=9.5, fontname=fn_bold, color=c_black)
     y2 += 13
-    page2.insert_text((55, y2), "• v(t) = 10 - t² (m/s). Xe dừng khi v(t) = 0 <=> t = √10 (s) (0,5 điểm).", fontsize=9, fontfile=font_regular, color=c_black)
+    page2.insert_text((55, y2), "• v(t) = 10 - t² (m/s). Xe dừng khi v(t) = 0 <=> t = √10 (s) (0,5 điểm).", fontsize=9, fontname=fn_reg, color=c_black)
     y2 += 12
-    page2.insert_text((55, y2), "• s = ∫(10 - t²)dt từ 0 đến √10 = (20√10)/3 ≈ 21,08 mét (0,5 điểm).", fontsize=9, fontfile=font_bold, color=c_red)
+    page2.insert_text((55, y2), "• s = ∫(10 - t²)dt từ 0 đến √10 = (20√10)/3 ≈ 21,08 mét (0,5 điểm).", fontsize=9, fontname=fn_bold, color=c_red)
 
     doc_pdf.save(pdf_path)
     doc_pdf.close()
