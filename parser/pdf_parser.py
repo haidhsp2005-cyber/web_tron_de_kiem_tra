@@ -1,0 +1,380 @@
+import os
+import re
+import pymupdf
+
+PART1_REGEX = re.compile(r"^\s*PH[^\s]*N\s+(I|1)[\.\:\s\-]", re.IGNORECASE)
+PART2_REGEX = re.compile(r"^\s*PH[^\s]*N\s+(II|2)[\.\:\s\-]", re.IGNORECASE)
+PART3_REGEX = re.compile(r"^\s*PH[^\s]*N\s+(III|3)[\.\:\s\-]", re.IGNORECASE)
+PART4_REGEX = re.compile(r"^\s*PH[^\s]*N\s+(IV|4)[\.\:\s\-]", re.IGNORECASE)
+QUESTION_REGEX = re.compile(r"^\s*(C[^\s]*u|B[^\s]*i)\s+(\d+)[\.\:\-\s]", re.IGNORECASE)
+CHOICE_SPLIT_REGEX = re.compile(r"(?=(?:^|\s{2,}|\t)([A-D])[\.\:\)])")
+
+def is_rgb_red(color_int: int) -> bool:
+    """Check if sRGB integer color is in red range."""
+    r = (color_int >> 16) & 255
+    g = (color_int >> 8) & 255
+    b = color_int & 255
+    return r >= 170 and g <= 90 and b <= 90
+
+class PdfParser:
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+        self.doc = pymupdf.open(file_path)
+        self.metadata = {
+            "title": "ĐỀ KIỂM TRA (PDF)",
+            "school": "THPT Long Cang",
+            "subject": "Toán",
+            "time": "90 phút",
+            "year": "2026 - 2027"
+        }
+        self.part1_questions = []
+        self.part2_questions = []
+        self.part3_questions = []
+        self.part4_questions = []
+
+    def parse(self) -> dict:
+        paragraphs_data = self._extract_paragraphs_from_pdf()
+        
+        current_part = 1
+        i = 0
+        n = len(paragraphs_data)
+        
+        while i < n:
+            p_data = paragraphs_data[i]
+            text = p_data["raw_text"].strip()
+            
+            # Skip instructions if any
+            if "HƯỚNG DẪN ĐỊNH DẠNG" in text.upper():
+                i += 1
+                continue
+                
+            if PART1_REGEX.search(text):
+                current_part = 1
+                i += 1
+                continue
+            elif PART2_REGEX.search(text):
+                current_part = 2
+                i += 1
+                continue
+            elif PART3_REGEX.search(text):
+                current_part = 3
+                i += 1
+                continue
+            elif PART4_REGEX.search(text):
+                current_part = 4
+                i += 1
+                continue
+                
+            q_match = QUESTION_REGEX.search(text)
+            if q_match:
+                if current_part == 1:
+                    i = self._parse_part1_question(paragraphs_data, i)
+                elif current_part == 2:
+                    i = self._parse_part2_question(paragraphs_data, i)
+                elif current_part == 3:
+                    i = self._parse_part3_question(paragraphs_data, i)
+                elif current_part == 4:
+                    i = self._parse_part4_question(paragraphs_data, i)
+                else:
+                    i += 1
+            else:
+                self._check_metadata(text)
+                i += 1
+
+        return {
+            "metadata": self.metadata,
+            "part1": self.part1_questions,
+            "part2": self.part2_questions,
+            "part3": self.part3_questions,
+            "part4": self.part4_questions,
+            "stats": {
+                "total_questions": len(self.part1_questions) + len(self.part2_questions) + len(self.part3_questions) + len(self.part4_questions),
+                "part1_count": len(self.part1_questions),
+                "part2_count": len(self.part2_questions),
+                "part3_count": len(self.part3_questions),
+                "part4_count": len(self.part4_questions)
+            }
+        }
+
+    def _extract_paragraphs_from_pdf(self) -> list[dict]:
+        paragraphs = []
+        for page in self.doc:
+            page_dict = page.get_text("dict")
+            for block in page_dict.get("blocks", []):
+                if "lines" not in block:
+                    continue
+                for line in block["lines"]:
+                    line_spans = []
+                    raw_line = ""
+                    has_red = False
+                    for span in line["spans"]:
+                        txt = span["text"]
+                        color = span.get("color", 0)
+                        is_red = is_rgb_red(color)
+                        if is_red:
+                            has_red = True
+                        line_spans.append({
+                            "text": txt,
+                            "is_red": is_red,
+                            "bbox": span.get("bbox", [])
+                        })
+                        raw_line += txt
+                    
+                    if raw_line.strip():
+                        paragraphs.append({
+                            "raw_text": raw_line.strip(),
+                            "spans": line_spans,
+                            "has_red": has_red
+                        })
+        return paragraphs
+
+    def _check_metadata(self, text: str):
+        if "SỞ" in text.upper() or "TRƯỜNG" in text.upper():
+            self.metadata["school"] = text.split("\n")[0].strip()
+        if "MÔN:" in text.upper() or "MÔN " in text.upper():
+            m = re.search(r"MÔN[\:\s]+([^\n\r]+)", text, re.IGNORECASE)
+            if m:
+                self.metadata["subject"] = m.group(1).strip()
+        if "THỜI GIAN" in text.upper():
+            m = re.search(r"(\d+)\s*phút", text, re.IGNORECASE)
+            if m:
+                self.metadata["time"] = f"{m.group(1)} phút"
+
+    # ================= PART 1 (MCQ) =================
+    def _parse_part1_question(self, paragraphs_data, start_idx) -> int:
+        p_data = paragraphs_data[start_idx]
+        raw_text = p_data["raw_text"]
+        q_match = QUESTION_REGEX.search(raw_text)
+        q_num = int(q_match.group(2)) if q_match else len(self.part1_questions) + 1
+        
+        clean_q_text = re.sub(r"^\s*(Câu|Bài)\s+\d+[\.\:\-\s]+", "", raw_text).strip()
+        choices = {"A": "", "B": "", "C": "", "D": ""}
+        correct_answer = "A"
+        found_red = False
+
+        idx = start_idx + 1
+        # Check inline choices
+        inline_c = self._extract_choices_from_pdf_p(p_data)
+        if len(inline_c) >= 2:
+            for k, info in inline_c.items():
+                choices[k] = info["text"]
+                if info["is_red"]:
+                    correct_answer = k
+                    found_red = True
+            self.part1_questions.append({
+                "id": len(self.part1_questions) + 1,
+                "original_num": q_num,
+                "question": clean_q_text,
+                "choices": choices,
+                "correct": correct_answer,
+                "has_red": found_red,
+                "xml_strings": []
+            })
+            return idx
+
+        while idx < len(paragraphs_data):
+            next_p = paragraphs_data[idx]
+            next_text = next_p["raw_text"].strip()
+            
+            if QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or PART4_REGEX.search(next_text):
+                break
+                
+            p_choices = self._extract_choices_from_pdf_p(next_p)
+            if p_choices:
+                for k, info in p_choices.items():
+                    choices[k] = info["text"]
+                    if info["is_red"]:
+                        correct_answer = k
+                        found_red = True
+                idx += 1
+            else:
+                if not any(choices.values()):
+                    clean_q_text += "<br>" + next_text
+                    idx += 1
+                else:
+                    break
+
+        self.part1_questions.append({
+            "id": len(self.part1_questions) + 1,
+            "original_num": q_num,
+            "question": clean_q_text,
+            "choices": choices,
+            "correct": correct_answer,
+            "has_red": found_red,
+            "xml_strings": []
+        })
+        return idx
+
+    def _extract_choices_from_pdf_p(self, p_data) -> dict:
+        res = {}
+        text = p_data["raw_text"]
+        matches = list(re.finditer(r"(?:^|\s{2,}|\t|\n)([A-D])[\.\:\)]\s*", text))
+        if not matches:
+            m_single = re.match(r"^\s*([A-D])[\.\:\)]\s*(.*)", text)
+            if m_single:
+                key = m_single.group(1).upper()
+                c_text = re.sub(r"^\s*([A-D])[\.\:\)]\s*", "", text).strip()
+                res[key] = {
+                    "text": c_text,
+                    "is_red": p_data["has_red"]
+                }
+            return res
+
+        curr_pos = 0
+        spans_mapped = []
+        for sp in p_data["spans"]:
+            s_len = len(sp["text"])
+            spans_mapped.append((curr_pos, curr_pos + s_len, sp["is_red"], sp["text"]))
+            curr_pos += s_len
+
+        for i, match in enumerate(matches):
+            key = match.group(1).upper()
+            m_start = match.start(1)
+            m_end = matches[i+1].start(1) if i + 1 < len(matches) else len(text)
+            c_text_raw = re.sub(r"^[A-D][\.\:\)]\s*", "", text[m_start:m_end]).strip()
+
+            choice_is_red = False
+            for s, e, is_red, sp_txt in spans_mapped:
+                if max(s, m_start) < min(e, m_end) and is_red:
+                    choice_is_red = True
+                    break
+
+            res[key] = {
+                "text": c_text_raw,
+                "is_red": choice_is_red
+            }
+        return res
+
+    # ================= PART 2 (TRUE / FALSE) =================
+    def _parse_part2_question(self, paragraphs_data, start_idx) -> int:
+        p_data = paragraphs_data[start_idx]
+        raw_text = p_data["raw_text"]
+        q_match = QUESTION_REGEX.search(raw_text)
+        q_num = int(q_match.group(2)) if q_match else len(self.part2_questions) + 1
+        
+        clean_q_text = re.sub(r"^\s*(Câu|Bài)\s+\d+[\.\:\-\s]+", "", raw_text).strip()
+        items = {
+            "a": {"text": "", "correct": False},
+            "b": {"text": "", "correct": False},
+            "c": {"text": "", "correct": False},
+            "d": {"text": "", "correct": False}
+        }
+        
+        idx = start_idx + 1
+        while idx < len(paragraphs_data):
+            next_p = paragraphs_data[idx]
+            next_text = next_p["raw_text"].strip()
+            
+            if QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or PART4_REGEX.search(next_text):
+                break
+                
+            item_match = re.match(r"^\s*([a-d])[\)\.]\s*(.*)", next_text, re.IGNORECASE)
+            if item_match:
+                key = item_match.group(1).lower()
+                content = re.sub(r"^\s*([a-d])[\)\.]\s*", "", next_text).strip()
+                
+                # True/False detection
+                is_true = next_p["has_red"]
+                if re.search(r"(\[|\()(Đ|·|D)úng(\]|\))", next_text, re.IGNORECASE):
+                    is_true = True
+                elif re.search(r"(\[|\()Sai(\]|\))", next_text, re.IGNORECASE):
+                    is_true = False
+                    
+                clean_content = re.sub(r"(\[|\()(Đ|·|D)úng(\]|\))|(\[|\()Sai(\]|\))", "", content, flags=re.IGNORECASE).strip()
+                items[key] = {
+                    "text": clean_content,
+                    "correct": is_true
+                }
+                idx += 1
+            else:
+                if not any(v["text"] for v in items.values()):
+                    clean_q_text += "<br>" + next_text
+                    idx += 1
+                else:
+                    break
+
+        self.part2_questions.append({
+            "id": len(self.part2_questions) + 1,
+            "original_num": q_num,
+            "question": clean_q_text,
+            "items": items,
+            "xml_strings": []
+        })
+        return idx
+
+    # ================= PART 3 (SHORT ANSWER) =================
+    def _parse_part3_question(self, paragraphs_data, start_idx) -> int:
+        p_data = paragraphs_data[start_idx]
+        raw_text = p_data["raw_text"]
+        q_match = QUESTION_REGEX.search(raw_text)
+        q_num = int(q_match.group(2)) if q_match else len(self.part3_questions) + 1
+        
+        full_text = raw_text
+        idx = start_idx + 1
+        while idx < len(paragraphs_data):
+            next_p = paragraphs_data[idx]
+            next_text = next_p["raw_text"].strip()
+            if QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or PART4_REGEX.search(next_text):
+                break
+            full_text += "\n" + next_text
+            idx += 1
+
+        clean_q = full_text
+        answer = ""
+        ans_match = re.search(r"(?:[^\s]*áp\s*án|Đáp\s*án)[\:\s]+([^\n]+)", full_text, re.IGNORECASE)
+        if ans_match:
+            answer = ans_match.group(1).strip()
+            clean_q = re.sub(r"(?:[^\s]*áp\s*án|Đáp\s*án)[\:\s]+[^\n]+", "", clean_q, flags=re.IGNORECASE).strip()
+        else:
+            if p_data["has_red"]:
+                for sp in p_data["spans"]:
+                    if sp["is_red"] and sp["text"].strip():
+                        answer = sp["text"].strip()
+                        break
+
+        clean_q = re.sub(r"^\s*(C[^\s]*u|B[^\s]*i)\s+\d+[\.\:\-\s]+", "", clean_q).strip()
+
+        self.part3_questions.append({
+            "id": len(self.part3_questions) + 1,
+            "original_num": q_num,
+            "question": clean_q,
+            "answer": answer,
+            "xml_strings": []
+        })
+        return idx
+
+    # ================= PART 4 (ESSAY) =================
+    def _parse_part4_question(self, paragraphs_data, start_idx) -> int:
+        p_data = paragraphs_data[start_idx]
+        raw_text = p_data["raw_text"]
+        q_match = QUESTION_REGEX.search(raw_text)
+        q_num = int(q_match.group(2)) if q_match else len(self.part4_questions) + 1
+        
+        full_text = raw_text
+        idx = start_idx + 1
+        while idx < len(paragraphs_data):
+            next_p = paragraphs_data[idx]
+            next_text = next_p["raw_text"].strip()
+            if QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or PART4_REGEX.search(next_text):
+                break
+            full_text += "\n" + next_text
+            idx += 1
+
+        parts = re.split(r"(H[^\s]*ng\s*d[^\s]*n\s*ch[^\s]*m[\:\s]*|[^\s]*áp\s*án[\:\s]*)", full_text, flags=re.IGNORECASE)
+        if len(parts) >= 3:
+            q_part = parts[0].strip()
+            guide_part = "".join(parts[1:]).strip()
+        else:
+            q_part = full_text
+            guide_part = ""
+
+        clean_q = re.sub(r"^\s*(C[^\s]*u|B[^\s]*i)\s+\d+(\s*\([^\)]+\))?[\.\:\-\s]+", "", q_part).strip()
+
+        self.part4_questions.append({
+            "id": len(self.part4_questions) + 1,
+            "original_num": q_num,
+            "question": clean_q,
+            "guide": guide_part,
+            "xml_strings": []
+        })
+        return idx

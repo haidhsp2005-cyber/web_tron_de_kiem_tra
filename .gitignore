@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# Environment Variables
+.env
+.env.local
+
+# Scratch & Task logs
+scratch/
+.system_generated/
+*.log
+
+# Uploads & Temp Exports (keep folder structure)
+uploads/*
+!uploads/.gitkeep
+exports/*
+!exports/.gitkeep
+!exports/Bang_dap_an_tong_hop.docx
+!exports/Bang_dap_an_tong_hop.xlsx
+!exports/Bo_de_thi_tron.zip
+!exports/De_thi_101.docx
+!exports/Dap_an_chi_tiet_101.docx

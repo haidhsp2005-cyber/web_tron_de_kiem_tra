@@ -1,0 +1,14 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.git
+.gitignore
+.env
+scratch/
+.system_generated/
+*.log
+run.bat
+run.ps1
+khoi_dong.bat
+HUONG_DAN_SU_DUNG.txt

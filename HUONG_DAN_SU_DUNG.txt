@@ -1,0 +1,28 @@
+===============================================================================
+       HƯỚNG DẪN TỰ CHẠY HỆ THỐNG TRỘN ĐỀ THI TRẮC NGHIỆM CHUẨN BỘ GD&ĐT
+===============================================================================
+
+1. CÁCH KHỞI ĐỘNG HỆ THỐNG (KHÔNG CẦN QUA TRỢ LÝ AI):
+   - Bạn chỉ cần NHẤP ĐÚP CHUỘT (Double-click) vào file:
+     👉 run.bat (hoặc khoi_dong.bat)
+
+2. ĐIỀU GÌ SẼ XẢY RA KHI BẠN CHẠY:
+   - Một cửa sổ dòng lệnh màu đen sẽ xuất hiện và tự động kiểm tra Python & thư viện.
+   - Sau 2 giây, hệ thống sẽ TỰ ĐỘNG MỞ TRÌNH DUYỆT WEB (Chrome / Edge / Firefox)
+     truy cập thẳng vào địa chỉ:
+     👉 http://localhost:8000
+   - Bạn có thể tải đề mẫu, tải lên đề thi Word/PDF của mình, chỉnh sửa và trộn đề
+     hoàn toàn trực quan trên giao diện web.
+
+3. KHI SỬ DỤNG XONG (DỪNG MÁY CHỦ):
+   - Bạn có thể bấm tổ hợp phím [Ctrl + C] trong cửa sổ dòng lệnh màu đen,
+     hoặc chỉ cần ĐÓNG CỬA SỔ DÒNG LỆNH ĐÓ (nút X góc trên bên phải).
+
+4. LƯU Ý KHI SỬ DỤNG:
+   - Trong lúc đang trộn đề và tải file trên web, hãy giữ cửa sổ dòng lệnh chạy ngầm
+     (bạn có thể thu nhỏ xuống thanh taskbar).
+   - Nếu bạn chuyển toàn bộ thư mục sang máy tính khác chưa cài thư viện, file run.bat
+     sẽ tự động phát hiện và cài đặt các thư viện từ file requirements.txt.
+
+Chúc bạn có những kỳ thi và bài kiểm tra thành công!
+===============================================================================

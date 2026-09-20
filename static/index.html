@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Trộn Đề Thi Chuẩn Bộ GD&ĐT - Word & PDF</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- KaTeX CSS & JS for Math Rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen custom-scrollbar">
+
+    <!-- Top Navbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+                    <i data-lucide="layers" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900 leading-tight">Hệ Thống Trộn Đề Thi Chuẩn Bộ GD&ĐT</h1>
+                    <p class="text-xs text-slate-500">Hỗ trợ Word (.docx), PDF | Cấu trúc 4 Phần | Bảo toàn Công thức Toán - Lý - Hóa</p>
+                </div>
+            </div>
+
+            <!-- Quick Template Download & Sample Actions -->
+            <div class="flex items-center space-x-2">
+                <a href="/api/download-sample-docx" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition border border-blue-200 shadow-sm" title="Tải mẫu đề Word (.docx) chuẩn để làm theo">
+                    <i data-lucide="file-text" class="w-4 h-4 text-blue-600"></i>
+                    <span>Tải Mẫu Đề Word</span>
+                </a>
+                <a href="/api/download-sample-pdf" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 transition border border-rose-200 shadow-sm" title="Tải mẫu đề PDF chuẩn">
+                    <i data-lucide="file-down" class="w-4 h-4 text-rose-600"></i>
+                    <span>Tải Mẫu PDF</span>
+                </a>
+                <button id="btn-load-sample" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition shadow-sm" title="Nạp nhanh bộ đề mẫu Toán - Lý - Hóa có sẵn để trải nghiệm">
+                    <i data-lucide="zap" class="w-4 h-4"></i>
+                    <span>⚡ Thử Đề Mẫu Ngay</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs / Steps -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <div class="flex border-b border-slate-200 space-x-8">
+            <button id="tab-btn-step1" class="pb-3 text-sm font-bold border-b-2 border-brand-600 text-brand-700 flex items-center space-x-2">
+                <span class="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs">1</span>
+                <span>Tải Đề & Biên Tập Chỉnh Sửa</span>
+            </button>
+            <button id="tab-btn-step2" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2">
+                <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs">2</span>
+                <span>Cấu Hình Trộn & Xuất File</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- ================= SECTION 1: LOAD ĐỀ & CHỈNH SỬA ================= -->
+        <section id="step1-content" class="space-y-6">
+
+            <!-- Upload Area -->
+            <div id="dropzone" class="border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-2xl bg-white p-8 text-center transition cursor-pointer group shadow-sm">
+                <input type="file" id="file-input" accept=".docx,.pdf" class="hidden">
+                <div class="max-w-md mx-auto space-y-3">
+                    <div class="w-14 h-14 mx-auto rounded-full bg-slate-100 group-hover:bg-brand-50 text-slate-500 group-hover:text-brand-600 flex items-center justify-center transition">
+                        <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+                    </div>
+                    <div>
+                        <p class="text-base font-semibold text-slate-700">Kéo & Thả file đề thi vào đây, hoặc <span class="text-brand-600 font-bold underline">chọn từ máy tính</span></p>
+                        <p class="text-xs text-slate-500 mt-1">Định dạng hỗ trợ: <strong>Word (.docx)</strong> hoặc <strong>PDF (.pdf)</strong></p>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-center gap-2 pt-2 text-xs text-slate-600">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 font-medium">✓ Nhận diện 4 phần I, II, III, IV</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-medium">✓ Tự động nhận đáp án tô đỏ</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">✓ Bảo toàn công thức H₂SO₄, Fe³⁺, OMML, Ω, λ</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loading-spinner" class="hidden bg-white p-8 rounded-2xl border border-slate-200 text-center shadow-sm">
+                <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-brand-600 border-t-transparent mb-3"></div>
+                <p id="loading-text" class="text-sm font-semibold text-slate-700">Đang phân tích cấu trúc đề thi và quét đáp án tô đỏ...</p>
+                <p class="text-xs text-slate-500 mt-1">Hệ thống đang bảo toàn các ký tự toán học, lý học, hóa học...</p>
+            </div>
+
+            <!-- Exam Overview & Statistics Card (Hidden until loaded) -->
+            <div id="exam-stats-container" class="hidden space-y-4">
+                
+                <!-- Summary bar -->
+                <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <div class="flex items-center space-x-2">
+                            <span id="badge-filename" class="px-2.5 py-1 rounded-md text-xs font-bold bg-slate-800 text-white">de_thi.docx</span>
+                            <h2 id="exam-title-text" class="text-base font-bold text-slate-900">Đề Kiểm Tra</h2>
+                        </div>
+                        <p id="exam-meta-text" class="text-xs text-slate-500">Môn: Tự nhiên | Thời gian: 90 phút</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button id="btn-save-exam" class="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition">
+                            <i data-lucide="save" class="w-4 h-4"></i>
+                            <span>Lưu Đề Đã Chỉnh Sửa</span>
+                        </button>
+                        <button id="btn-go-to-step2" class="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white shadow-sm transition">
+                            <span>Tiếp tục Trộn Đề</span>
+                            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Count Badges -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div class="bg-blue-50/70 border border-blue-200 rounded-xl p-4">
+                        <p class="text-xs font-semibold text-blue-700 uppercase tracking-wider">Phần I: Trắc nghiệm</p>
+                        <div class="flex items-baseline space-x-2 mt-1">
+                            <span id="stat-p1-count" class="text-2xl font-bold text-blue-900">0</span>
+                            <span class="text-xs text-blue-600">câu (A, B, C, D)</span>
+                        </div>
+                    </div>
+                    <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4">
+                        <p class="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Phần II: Đúng / Sai</p>
+                        <div class="flex items-baseline space-x-2 mt-1">
+                            <span id="stat-p2-count" class="text-2xl font-bold text-emerald-900">0</span>
+                            <span class="text-xs text-emerald-600">câu (a, b, c, d)</span>
+                        </div>
+                    </div>
+                    <div class="bg-amber-50/70 border border-amber-200 rounded-xl p-4">
+                        <p class="text-xs font-semibold text-amber-700 uppercase tracking-wider">Phần III: Trả lời ngắn</p>
+                        <div class="flex items-baseline space-x-2 mt-1">
+                            <span id="stat-p3-count" class="text-2xl font-bold text-amber-900">0</span>
+                            <span class="text-xs text-amber-600">câu điền số</span>
+                        </div>
+                    </div>
+                    <div class="bg-purple-50/70 border border-purple-200 rounded-xl p-4">
+                        <p class="text-xs font-semibold text-purple-700 uppercase tracking-wider">Phần IV: Tự luận</p>
+                        <div class="flex items-baseline space-x-2 mt-1">
+                            <span id="stat-p4-count" class="text-2xl font-bold text-purple-900">0</span>
+                            <span class="text-xs text-purple-600">câu bài tập</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Questions Editor Container -->
+                <div class="space-y-6 pt-2">
+                    
+                    <!-- Section I Editor -->
+                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div class="bg-blue-50/50 border-b border-blue-100 px-6 py-4 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-6 h-6 rounded bg-blue-600 text-white font-bold text-xs flex items-center justify-center">I</span>
+                                <h3 class="font-bold text-slate-800 text-sm">PHẦN I: Câu hỏi Trắc nghiệm nhiều phương án lựa chọn (Chọn 1 đáp án A, B, C, D)</h3>
+                            </div>
+                            <span class="text-xs font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full" id="p1-counter-tag">0 câu</span>
+                        </div>
+                        <div id="p1-questions-list" class="p-6 space-y-6 divide-y divide-slate-100">
+                            <!-- Injected by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Section II Editor -->
+                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div class="bg-emerald-50/50 border-b border-emerald-100 px-6 py-4 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-6 h-6 rounded bg-emerald-600 text-white font-bold text-xs flex items-center justify-center">II</span>
+                                <h3 class="font-bold text-slate-800 text-sm">PHẦN II: Câu hỏi Trắc nghiệm Đúng / Sai (Đánh dấu Đúng hoặc Sai cho mỗi ý a, b, c, d)</h3>
+                            </div>
+                            <span class="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full" id="p2-counter-tag">0 câu</span>
+                        </div>
+                        <div id="p2-questions-list" class="p-6 space-y-6 divide-y divide-slate-100">
+                            <!-- Injected by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Section III Editor -->
+                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div class="bg-amber-50/50 border-b border-amber-100 px-6 py-4 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-6 h-6 rounded bg-amber-600 text-white font-bold text-xs flex items-center justify-center">III</span>
+                                <h3 class="font-bold text-slate-800 text-sm">PHẦN III: Câu hỏi Trắc nghiệm trả lời ngắn (Nhập đáp số / chuỗi kết quả)</h3>
+                            </div>
+                            <span class="text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full" id="p3-counter-tag">0 câu</span>
+                        </div>
+                        <div id="p3-questions-list" class="p-6 space-y-6 divide-y divide-slate-100">
+                            <!-- Injected by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Section IV Editor -->
+                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div class="bg-purple-50/50 border-b border-purple-100 px-6 py-4 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-6 h-6 rounded bg-purple-600 text-white font-bold text-xs flex items-center justify-center">IV</span>
+                                <h3 class="font-bold text-slate-800 text-sm">PHẦN IV: Câu hỏi Tự luận (Kèm hướng dẫn chấm & thang điểm)</h3>
+                            </div>
+                            <span class="text-xs font-semibold text-purple-700 bg-purple-100 px-2.5 py-1 rounded-full" id="p4-counter-tag">0 câu</span>
+                        </div>
+                        <div id="p4-questions-list" class="p-6 space-y-6 divide-y divide-slate-100">
+                            <!-- Injected by JavaScript -->
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- ================= SECTION 2: CẤU HÌNH TRỘN & XUẤT KẾT QUẢ ================= -->
+        <section id="step2-content" class="hidden space-y-6">
+
+            <!-- Shuffling Configuration Card -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+                        <i data-lucide="sliders" class="w-5 h-5 text-brand-600"></i>
+                        <span>Cài Đặt Thông Tin & Tùy Chọn Trộn Đề</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Thiết lập số lượng đề, mã đề và cấu hình hoán vị từng phần</p>
+                </div>
+
+                <!-- Form Fields -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Số lượng mã đề cần tạo:</label>
+                        <input type="number" id="cfg-num-variants" value="4" min="1" max="20" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Mã đề bắt đầu:</label>
+                        <input type="number" id="cfg-start-code" value="101" min="100" max="999" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-brand-500 outline-none">
+                        <p class="text-[11px] text-slate-400 mt-1">Ví dụ: 101 -> Tạo mã 101, 102, 103, 104</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Môn học:</label>
+                        <select id="cfg-subject-select" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                            <option value="Toán">Toán</option>
+                            <option value="Vật lý">Vật lý (Lý)</option>
+                            <option value="Hóa học">Hóa học (Hóa)</option>
+                            <option value="Sinh học">Sinh học (Sinh)</option>
+                            <option value="Tin học">Tin học</option>
+                            <option value="Ngữ Văn">Ngữ Văn</option>
+                            <option value="Lịch Sử">Lịch Sử</option>
+                            <option value="Địa Lý">Địa Lý</option>
+                            <option value="GDKT&PL">GDKT & PL (Giáo dục Kinh tế và Pháp luật)</option>
+                            <option value="GDCD">GDCD (Giáo dục Công dân)</option>
+                            <option value="GDQP">GDQP (Giáo dục Quốc phòng & An ninh)</option>
+                            <option value="Mỹ Thuật">Mỹ Thuật</option>
+                            <option value="Âm Nhạc">Âm Nhạc</option>
+                            <option value="HĐTN">HĐTN (Hoạt động trải nghiệm)</option>
+                            <option value="GDĐP">GDĐP (Giáo dục địa phương)</option>
+                            <option value="__other__">Môn khác...</option>
+                        </select>
+                        <input type="text" id="cfg-subject-other" placeholder="Nhập tên môn học khác..." class="hidden w-full mt-2 px-3 py-1.5 border border-brand-300 bg-brand-50/30 rounded-lg text-xs font-medium text-slate-900 focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Thời gian làm bài:</label>
+                        <input type="text" id="cfg-time" value="90 phút" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Tên trường / Đơn vị:</label>
+                        <input type="text" id="cfg-school" value="THPT Long Cang" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Năm học / Kỳ thi:</label>
+                        <input type="text" id="cfg-year" value="2026 - 2027" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                </div>
+
+                <!-- Shuffling checkboxes -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <p class="text-xs font-bold text-slate-700 uppercase tracking-wider">Quy tắc đảo nội dung:</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs text-slate-700">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="cfg-shuf-p1-q" checked class="rounded text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span>Đảo thứ tự câu hỏi <strong>Phần I</strong></span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="cfg-shuf-p1-c" checked class="rounded text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span>Đảo phương án A, B, C, D <strong>Phần I</strong></span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="cfg-shuf-p2-q" checked class="rounded text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span>Đảo thứ tự câu hỏi <strong>Phần II</strong></span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="cfg-shuf-p2-i" checked class="rounded text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span>Đảo các ý a, b, c, d <strong>Phần II</strong></span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="cfg-shuf-p3-q" checked class="rounded text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span>Đảo thứ tự câu hỏi <strong>Phần III</strong></span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="cfg-shuf-p4-q" class="rounded text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span>Đảo thứ tự câu hỏi <strong>Phần IV (Tự luận)</strong></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <div class="text-center pt-2">
+                    <button id="btn-execute-shuffle" class="inline-flex items-center space-x-2 px-8 py-3.5 rounded-xl text-sm font-bold bg-brand-600 hover:bg-brand-700 text-white shadow-lg shadow-brand-500/25 transition transform active:scale-95">
+                        <i data-lucide="shuffle" class="w-5 h-5"></i>
+                        <span>🚀 BẮT ĐẦU TRỘN ĐỀ VÀ TẠO BỘ ĐỀ HOÀN CHỈNH</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Shuffling Processing Spinner -->
+            <div id="shuffle-spinner" class="hidden bg-white p-8 rounded-2xl border border-slate-200 text-center shadow-sm">
+                <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-brand-600 border-t-transparent mb-3"></div>
+                <p class="text-sm font-bold text-slate-800">Đang thực hiện thuật toán trộn đề thông minh...</p>
+                <p class="text-xs text-slate-500 mt-1">Đang tạo file Word (.docx), file Excel ma trận (.xlsx) và đóng gói trọn bộ ZIP...</p>
+            </div>
+
+            <!-- Results Section (Hidden until generated) -->
+            <div id="results-container" class="hidden space-y-6">
+
+                <!-- Download Center -->
+                <div class="bg-gradient-to-br from-slate-900 to-brand-950 text-white rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+                        <div>
+                            <span class="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 text-xs font-bold uppercase tracking-wider">Thành công</span>
+                            <h3 class="text-xl font-bold text-white mt-1">Đã Tạo Thành Công Bộ Đề Trộn</h3>
+                            <p class="text-xs text-slate-400 mt-0.5">Tải trọn gói hoặc tải từng file đề Word, file đáp án chi tiết và bảng tổng hợp</p>
+                        </div>
+
+                        <!-- 1-Click ZIP Download -->
+                        <a id="btn-download-zip" href="#" class="inline-flex items-center space-x-2 px-6 py-3 rounded-xl text-sm font-bold bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 transition transform hover:-translate-y-0.5">
+                            <i data-lucide="archive" class="w-5 h-5"></i>
+                            <span>TẢI TRỌN BỘ (.ZIP)</span>
+                        </a>
+                    </div>
+
+                    <!-- Summary File Links -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <a id="btn-download-excel" href="#" class="flex items-center space-x-3 p-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 transition group">
+                            <div class="w-10 h-10 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
+                                <i data-lucide="table" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-white group-hover:text-emerald-400 transition">Bảng Ma Trận Đáp Án (.xlsx)</p>
+                                <p class="text-[11px] text-slate-400">Đầy đủ 4 phần chia từng sheet rõ ràng</p>
+                            </div>
+                        </a>
+
+                        <a id="btn-download-summary-docx" href="#" class="flex items-center space-x-3 p-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 transition group">
+                            <div class="w-10 h-10 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-sm">
+                                <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-white group-hover:text-blue-400 transition">Bảng Tổng Hợp Đáp Án Word (.docx)</p>
+                                <p class="text-[11px] text-slate-400">In ấn hoặc dán bảng thông báo</p>
+                            </div>
+                        </a>
+                    </div>
+
+                    <!-- Individual Variants Download Grid -->
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Tải từng mã đề thi:</p>
+                        <div id="variants-download-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <!-- Injected by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Web Live Matrix Preview -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6" id="print-section">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+                                <i data-lucide="grid" class="w-5 h-5 text-brand-600"></i>
+                                <span>BẢNG ĐÁP ÁN TỔNG HỢP TRỰC QUAN (4 PHẦN)</span>
+                            </h3>
+                            <p class="text-xs text-slate-500">Xem nhanh đáp án của tất cả các mã đề thi được tạo</p>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <button onclick="window.print()" class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                                <i data-lucide="printer" class="w-4 h-4"></i>
+                                <span>In Bảng Này</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tab view for the 4 parts matrix -->
+                    <div class="space-y-6">
+                        
+                        <!-- PART I MATRIX -->
+                        <div class="space-y-2">
+                            <h4 class="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center space-x-1.5">
+                                <span class="w-5 h-5 rounded bg-blue-600 text-white flex items-center justify-center text-[10px]">I</span>
+                                <span>Phần I: Ma trận đáp án trắc nghiệm khách quan</span>
+                            </h4>
+                            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table class="w-full text-xs text-center border-collapse">
+                                    <thead id="matrix-p1-thead" class="bg-blue-800 text-white font-bold">
+                                        <!-- Injected -->
+                                    </thead>
+                                    <tbody id="matrix-p1-tbody" class="divide-y divide-slate-200 bg-white font-semibold">
+                                        <!-- Injected -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- PART II MATRIX -->
+                        <div class="space-y-2">
+                            <h4 class="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center space-x-1.5">
+                                <span class="w-5 h-5 rounded bg-emerald-600 text-white flex items-center justify-center text-[10px]">II</span>
+                                <span>Phần II: Ma trận đáp án trắc nghiệm Đúng / Sai</span>
+                            </h4>
+                            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table class="w-full text-xs text-center border-collapse">
+                                    <thead id="matrix-p2-thead" class="bg-emerald-800 text-white font-bold">
+                                        <!-- Injected -->
+                                    </thead>
+                                    <tbody id="matrix-p2-tbody" class="divide-y divide-slate-200 bg-white">
+                                        <!-- Injected -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- PART III MATRIX -->
+                        <div class="space-y-2">
+                            <h4 class="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center space-x-1.5">
+                                <span class="w-5 h-5 rounded bg-amber-600 text-white flex items-center justify-center text-[10px]">III</span>
+                                <span>Phần III: Bảng đáp án trả lời ngắn</span>
+                            </h4>
+                            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table class="w-full text-xs text-center border-collapse">
+                                    <thead id="matrix-p3-thead" class="bg-amber-800 text-white font-bold">
+                                        <!-- Injected -->
+                                    </thead>
+                                    <tbody id="matrix-p3-tbody" class="divide-y divide-slate-200 bg-white font-bold">
+                                        <!-- Injected -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-xs font-medium">
+            <i id="toast-icon" data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+            <span id="toast-msg">Thông báo</span>
+        </div>
+    </div>
+
+    <!-- Frontend Script -->
+    <script src="app.js?v=20260919_v3"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
