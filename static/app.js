@@ -284,7 +284,7 @@ function renderExamEditor(data, filename) {
                     <span class="text-xs text-slate-400 font-medium">Gốc: Câu ${q.original_num || (idx+1)}</span>
                 </div>
                 <div class="space-y-1.5">
-                    <div class="math-preview p-3.5 rounded-xl bg-blue-50/40 border border-blue-200 text-sm text-slate-900 leading-relaxed font-sans shadow-sm" id="p1-prev-q-${idx}">${q.question}</div>
+                    <div class="math-preview p-3.5 rounded-xl bg-blue-50/40 border border-blue-200 text-sm text-slate-900 leading-relaxed font-sans shadow-sm" id="p1-prev-q-${idx}">${formatMathPreview(q.question)}</div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                     ${['A', 'B', 'C', 'D'].map(k => {
@@ -294,7 +294,7 @@ function renderExamEditor(data, filename) {
                                 <input type="radio" name="p1_correct_${idx}" value="${k}" ${isCorrect ? 'checked' : ''} class="p1-choice-radio mt-0.5 text-brand-600 focus:ring-brand-500 pointer-events-none" data-qidx="${idx}">
                                 <div class="flex-1">
                                     <span class="font-bold text-xs ${isCorrect ? 'text-brand-700' : 'text-slate-700'} mr-1.5">${k}.</span>
-                                    <span class="math-preview text-sm ${isCorrect ? 'font-bold text-brand-900' : 'font-semibold text-slate-800'}" id="p1-prev-c-${idx}-${k}">${q.choices[k] || ''}</span>
+                                    <span class="math-preview text-sm ${isCorrect ? 'font-bold text-brand-900' : 'font-semibold text-slate-800'}" id="p1-prev-c-${idx}-${k}">${formatMathPreview(q.choices[k] || '')}</span>
                                 </div>
                             </div>
                         `;
@@ -318,7 +318,7 @@ function renderExamEditor(data, filename) {
                     <span class="text-xs text-slate-400 font-medium">Gốc: Câu ${q.original_num || (idx+1)}</span>
                 </div>
                 <div class="space-y-1.5">
-                    <div class="math-preview p-3.5 rounded-xl bg-emerald-50/40 border border-emerald-200 text-sm text-slate-900 leading-relaxed font-sans shadow-sm" id="p2-prev-q-${idx}">${q.question}</div>
+                    <div class="math-preview p-3.5 rounded-xl bg-emerald-50/40 border border-emerald-200 text-sm text-slate-900 leading-relaxed font-sans shadow-sm" id="p2-prev-q-${idx}">${formatMathPreview(q.question)}</div>
                 </div>
                 <div class="space-y-2 pt-1">
                     ${['a', 'b', 'c', 'd'].map(k => {
@@ -328,7 +328,7 @@ function renderExamEditor(data, filename) {
                             <div class="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-3 shadow-xs">
                                 <div class="flex items-center space-x-2.5 flex-1">
                                     <span class="font-bold text-xs text-slate-700 w-5">${k})</span>
-                                    <div class="math-preview text-sm font-medium text-slate-800" id="p2-prev-item-${idx}-${k}">${item.text || ''}</div>
+                                    <div class="math-preview text-sm font-medium text-slate-800" id="p2-prev-item-${idx}-${k}">${formatMathPreview(item.text || '')}</div>
                                 </div>
                                 <div class="flex items-center space-x-1.5 shrink-0">
                                     <button type="button" class="p2-toggle-btn px-3 py-1 rounded-md text-xs font-bold transition shadow-xs ${isTrue ? 'bg-emerald-600 text-white shadow-emerald-500/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}" data-qidx="${idx}" data-key="${k}" data-val="true">
@@ -360,7 +360,7 @@ function renderExamEditor(data, filename) {
                     <span class="text-xs text-slate-400 font-medium">Gốc: Câu ${q.original_num || (idx+1)}</span>
                 </div>
                 <div class="space-y-1.5">
-                    <div class="math-preview p-3.5 rounded-xl bg-amber-50/40 border border-amber-200 text-sm text-slate-900 leading-relaxed font-sans shadow-sm" id="p3-prev-q-${idx}">${q.question}</div>
+                    <div class="math-preview p-3.5 rounded-xl bg-amber-50/40 border border-amber-200 text-sm text-slate-900 leading-relaxed font-sans shadow-sm" id="p3-prev-q-${idx}">${formatMathPreview(q.question)}</div>
                 </div>
                 <div class="flex items-center space-x-3 pt-1">
                     <label class="text-xs font-bold text-slate-700">Đáp án:</label>
@@ -384,12 +384,12 @@ function renderExamEditor(data, filename) {
                     <span class="text-xs text-slate-400 font-medium">Gốc: Câu ${q.original_num || (idx+1)}</span>
                 </div>
                 <div class="space-y-1.5">
-                    <div class="math-preview p-3.5 rounded-xl bg-purple-50/40 border border-purple-200 text-sm text-slate-900 leading-relaxed font-sans shadow-sm" id="p4-prev-q-${idx}">${q.question}</div>
+                    <div class="math-preview p-3.5 rounded-xl bg-purple-50/40 border border-purple-200 text-sm text-slate-900 leading-relaxed font-sans shadow-sm" id="p4-prev-q-${idx}">${formatMathPreview(q.question)}</div>
                 </div>
                 ${q.guide ? `
                 <div class="space-y-1 pt-1">
                     <label class="text-xs text-purple-700 font-bold">Hướng dẫn chấm & Thang điểm:</label>
-                    <div class="math-preview p-3.5 rounded-xl bg-purple-50/40 border border-purple-200 text-xs text-slate-800 leading-relaxed font-sans shadow-sm" id="p4-prev-guide-${idx}">${q.guide}</div>
+                    <div class="math-preview p-3.5 rounded-xl bg-purple-50/40 border border-purple-200 text-xs text-slate-800 leading-relaxed font-sans shadow-sm" id="p4-prev-guide-${idx}">${formatMathPreview(q.guide)}</div>
                 </div>
                 ` : ''}
             `;
@@ -775,4 +775,13 @@ function escapeHtml(text) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+// Convert unicode vector markers to LaTeX \vec for crisp KaTeX rendering
+function formatMathPreview(html) {
+    if (!html) return "";
+    let s = String(html);
+    // Convert unicode vector arrows (e.g. u\u20d7, a\u20d7, u⃗, a⃗, AB⃗) into KaTeX $\vec{...}$
+    s = s.replace(/([A-Za-z]{1,3})[\u20D7\u2192\u20D6⃗]/g, "$\\vec{$1}$");
+    return s;
 }

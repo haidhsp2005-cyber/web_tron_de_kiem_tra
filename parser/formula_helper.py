@@ -218,6 +218,8 @@ def extract_element_text_with_formatting(elem) -> tuple[str, bool]:
             elif c_tag == "tab":
                 texts.append("    ")
         txt = "".join(texts)
+        if any(c in txt for c in ["\u20d7", "\u20d6", "\u2192", "⃗"]):
+            txt = re.sub(r"([A-Za-z]{1,3})[\u20D7\u2192\u20D6⃗]", r"$\\vec{\1}$", txt)
         
         if valign == "subscript":
             txt = f"<sub>{txt}</sub>"

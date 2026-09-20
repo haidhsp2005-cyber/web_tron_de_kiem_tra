@@ -90,7 +90,17 @@ def add_part3_answer_box(doc):
     p1.paragraph_format.line_spacing = Pt(14)
     add_run(p1, "")
 
-def add_2x2_choices(doc, choices: list[tuple[str, str]], correct_key: str = None):
+def make_omml_vector(vec_name: str, tail: str, is_red: bool = False):
+    """Creates a native OMML vector equation for Word: \vec{vec_name} = tail"""
+    color_w = '<w:color w:val="DC2626"/><w:b/>' if is_red else ''
+    return parse_xml(
+        f'<m:oMath {nsdecls("m")} {nsdecls("w")}>'
+        f'<m:acc><m:accPr><m:chr m:val="⃗"/></m:accPr><m:e><m:r><w:rPr>{color_w}</w:rPr><m:t>{vec_name}</m:t></m:r></m:e></m:acc>'
+        f'<m:r><w:rPr>{color_w}</w:rPr><m:t xml:space="preserve"> = {tail}</m:t></m:r>'
+        f'</m:oMath>'
+    )
+
+def add_2x2_choices(doc, choices: list[tuple], correct_key: str = None):
     """
     Creates a 2x2 borderless table for choices:
     Row 0: Cell 0 = A, Cell 1 = B
@@ -120,7 +130,10 @@ def add_2x2_choices(doc, choices: list[tuple[str, str]], correct_key: str = None
         p.paragraph_format.line_spacing = 1.15
         is_corr = (k.strip().upper() == (correct_key or "").strip().upper())
         add_run(p, f"{k}. ", bold=True, is_red=is_corr)
-        add_run(p, val, bold=is_corr, is_red=is_corr)
+        if callable(val):
+            val(p, is_corr)
+        else:
+            add_run(p, val, bold=is_corr, is_red=is_corr)
 
 def setup_footer(doc, code: str = "101"):
     """Sets up exam footer: left = Mã đề thi: {code}, right = Trang {PAGE}/{NUMPAGES} across all pages."""
@@ -330,17 +343,26 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
     p_q6 = doc.add_paragraph()
     add_run(p_q6, "Câu 6: ", bold=True)
     add_run(p_q6, "Trong không gian Oxyz, cho hai vectơ ")
-    add_run(p_q6, "a⃗ = (1; 2; -1)", italic=True)
+    p_q6._p.append(make_omml_vector("a", "(1; 2; -1)"))
     add_run(p_q6, " và ")
-    add_run(p_q6, "b⃗ = (2; 0; 1)", italic=True)
+    p_q6._p.append(make_omml_vector("b", "(2; 0; 1)"))
     add_run(p_q6, ". Tọa độ của vectơ ")
-    add_run(p_q6, "u⃗ = a⃗ + 2b⃗", italic=True)
+    omml_u_q6 = parse_xml(
+        f'<m:oMath {nsdecls("m")}>'
+        f'<m:acc><m:accPr><m:chr m:val="⃗"/></m:accPr><m:e><m:r><m:t>u</m:t></m:r></m:e></m:acc>'
+        f'<m:r><m:t xml:space="preserve"> = </m:t></m:r>'
+        f'<m:acc><m:accPr><m:chr m:val="⃗"/></m:accPr><m:e><m:r><m:t>a</m:t></m:r></m:e></m:acc>'
+        f'<m:r><m:t xml:space="preserve"> + 2</m:t></m:r>'
+        f'<m:acc><m:accPr><m:chr m:val="⃗"/></m:accPr><m:e><m:r><m:t>b</m:t></m:r></m:e></m:acc>'
+        f'</m:oMath>'
+    )
+    p_q6._p.append(omml_u_q6)
     add_run(p_q6, " là:")
     add_2x2_choices(doc, [
-        ("A", "u⃗ = (5; 2; 1)."),
-        ("B", "u⃗ = (3; 2; 0)."),
-        ("C", "u⃗ = (5; 4; 1)."),
-        ("D", "u⃗ = (4; 2; -1).")
+        ("A", lambda p, is_c: p._p.append(make_omml_vector("u", "(5; 2; 1).", is_c))),
+        ("B", lambda p, is_c: p._p.append(make_omml_vector("u", "(3; 2; 0).", is_c))),
+        ("C", lambda p, is_c: p._p.append(make_omml_vector("u", "(5; 4; 1).", is_c))),
+        ("D", lambda p, is_c: p._p.append(make_omml_vector("u", "(4; 2; -1).", is_c)))
     ], correct_key="A")
 
     # ==================== PHẦN II: TRẮC NGHIỆM ĐÚNG SAI (IN ĐẬM ĐÁP ÁN ĐỎ) ====================
