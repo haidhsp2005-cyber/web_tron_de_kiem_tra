@@ -8,6 +8,7 @@ PART3_REGEX = re.compile(r"^\s*PH[^\s]*N\s+(III|3)[\.\:\s\-]", re.IGNORECASE)
 PART4_REGEX = re.compile(r"^\s*PH[^\s]*N\s+(IV|4)[\.\:\s\-]", re.IGNORECASE)
 QUESTION_REGEX = re.compile(r"^\s*(C[^\s]*u|B[^\s]*i)\s+(\d+)[\.\:\-\s]", re.IGNORECASE)
 CHOICE_SPLIT_REGEX = re.compile(r"(?=(?:^|\s{2,}|\t)([A-D])[\.\:\)])")
+CHOICE_PATTERN = re.compile(r"(?:^|\t|\s{2,}|(?<=[^\s\+\-\*\/\=\~\±\∓\(\[\{\<\>\:\,\.\_])\s+)([A-D])[\.\:\)](?=\s*\S)")
 STOP_MARKER_REGEX = re.compile(r"(B[^\s]*NG\s+[^\s]*[AÁ]P\s+[AÁ]N|H[^\s]*NG\s+D[^\s]*N\s+CH[^\s]*M\s+(ĐỀ|MẪU|CHI\s+TIẾT|THI|\-\-)|\-\-+.*H[^\s]*T)", re.IGNORECASE)
 
 def is_rgb_red(color_int: int) -> bool:
@@ -267,7 +268,7 @@ class PdfParser:
     def _extract_choices_from_pdf_p(self, p_data) -> dict:
         res = {}
         text = p_data["raw_text"]
-        matches = list(re.finditer(r"(?:^|\s{2,}|\t)([A-D])[\.\:\)]\s*", text))
+        matches = list(CHOICE_PATTERN.finditer(text))
         if not matches:
             m_single = re.match(r"^\s*([A-D])[\.\:\)]\s*(.*)", text)
             if m_single:
@@ -279,6 +280,19 @@ class PdfParser:
                 }
             return res
 
+        # Filter matches: within the same paragraph/cell, choice keys must appear in strictly ascending order
+        filtered_matches = []
+        last_key_ord = -1
+        for m in matches:
+            k = m.group(1).upper()
+            k_ord = ord(k)
+            if k_ord > last_key_ord:
+                filtered_matches.append(m)
+                last_key_ord = k_ord
+
+        if not filtered_matches:
+            return res
+
         curr_pos = 0
         spans_mapped = []
         for sp in p_data["spans"]:
@@ -286,11 +300,13 @@ class PdfParser:
             spans_mapped.append((curr_pos, curr_pos + s_len, sp["is_red"], sp["text"]))
             curr_pos += s_len
 
-        for i, match in enumerate(matches):
+        for i, match in enumerate(filtered_matches):
             key = match.group(1).upper()
             m_start = match.start(1)
-            m_end = matches[i+1].start(1) if i + 1 < len(matches) else len(text)
+            m_end = filtered_matches[i+1].start(1) if i + 1 < len(filtered_matches) else len(text)
             c_text_raw = re.sub(r"^[A-D][\.\:\)]\s*", "", text[m_start:m_end]).strip()
+            if not c_text_raw:
+                continue
 
             choice_is_red = False
             for s, e, is_red, sp_txt in spans_mapped:

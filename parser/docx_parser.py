@@ -22,6 +22,7 @@ PART4_REGEX = re.compile(r"^\s*PHẦN\s+(IV|4)[\.\:\s\-]", re.IGNORECASE)
 
 QUESTION_REGEX = re.compile(r"^\s*(Câu|Bài)\s+(\d+)[\.\:\-\s]", re.IGNORECASE)
 CHOICE_SPLIT_REGEX = re.compile(r"(?=(?:^|\s{2,}|\t)([A-D])[\.\:\)])")
+CHOICE_PATTERN = re.compile(r"(?:^|\t|\s{2,}|(?<=[^\s\+\-\*\/\=\~\±\∓\(\[\{\<\>\:\,\.\_])\s+)([A-D])[\.\:\)](?=\s*\S)")
 
 class DocxParser:
     def __init__(self, file_path: str):
@@ -296,7 +297,7 @@ class DocxParser:
         text = p_data["raw_text"]
         fmt = p_data["formatted_text"]
         
-        matches = list(re.finditer(r"(?:^|\s+)([A-D])[\.\:\)]\s*", text))
+        matches = list(CHOICE_PATTERN.finditer(text))
         if not matches:
             m_single = re.match(r"^\s*([A-D])[\.\:\)]\s*(.*)", text)
             if m_single:
@@ -308,6 +309,19 @@ class DocxParser:
                     "is_red": p_data["has_red"],
                     "xml_strings": c_xmls
                 }
+            return res
+
+        # Filter matches: within the same paragraph/cell, choice keys must appear in strictly ascending order
+        filtered_matches = []
+        last_key_ord = -1
+        for m in matches:
+            k = m.group(1).upper()
+            k_ord = ord(k)
+            if k_ord > last_key_ord:
+                filtered_matches.append(m)
+                last_key_ord = k_ord
+
+        if not filtered_matches:
             return res
             
         # Build character-level or run-level color mapping
@@ -322,13 +336,15 @@ class DocxParser:
             elem_spans.append((start, end, is_red, elem, txt))
             curr_pos = end
 
-        for i, match in enumerate(matches):
+        for i, match in enumerate(filtered_matches):
             key = match.group(1).upper()
             m_start = match.start(1)
-            m_end = matches[i+1].start(1) if i + 1 < len(matches) else len(text)
+            m_end = filtered_matches[i+1].start(1) if i + 1 < len(filtered_matches) else len(text)
             
             # Substring text: from after marker to m_end
             c_text_raw = re.sub(r"^[A-D][\.\:\)]\s*", "", text[m_start:m_end]).strip()
+            if not c_text_raw:
+                continue
             
             # Check if any run overlapping [m_start, m_end] is red
             choice_is_red = False
