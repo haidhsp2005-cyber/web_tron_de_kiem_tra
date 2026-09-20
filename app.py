@@ -57,7 +57,7 @@ def download_sample_docx():
     return FileResponse(
         SAMPLE_DOCX,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        filename="de_thi_mau_chuan_toan_ly_hoa.docx"
+        filename="de_thi_mau_toan_in_dam_dap_an_do.docx"
     )
 
 @app.get("/api/download-sample-pdf")
@@ -67,7 +67,7 @@ def download_sample_pdf():
     return FileResponse(
         SAMPLE_PDF,
         media_type="application/pdf",
-        filename="de_thi_mau_chuan_toan_ly_hoa.pdf"
+        filename="de_thi_mau_toan_in_dam_dap_an_do.pdf"
     )
 
 @app.get("/api/load-sample")
@@ -82,11 +82,11 @@ def load_sample():
     
     sessions[session_id] = {
         "exam_data": data,
-        "filename": "de_thi_mau_chuan.docx"
+        "filename": "de_thi_mau_toan_dap_an_do.docx"
     }
     return {
         "session_id": session_id,
-        "filename": "de_thi_mau_chuan.docx",
+        "filename": "de_thi_mau_toan_dap_an_do.docx",
         "exam_data": data
     }
 

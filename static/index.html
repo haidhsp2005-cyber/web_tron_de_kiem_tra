@@ -49,17 +49,18 @@
 
             <!-- Quick Template Download & Sample Actions -->
             <div class="flex items-center space-x-2">
-                <a href="/api/download-sample-docx" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition border border-blue-200 shadow-sm" title="Tải mẫu đề Word (.docx) chuẩn để làm theo">
+                <span class="hidden lg:inline-flex text-xs font-semibold text-slate-600 mr-0.5">Mẫu Đề Toán:</span>
+                <a href="/api/download-sample-docx" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition border border-blue-200 shadow-sm" title="Tải mẫu đề Word (.docx) môn Toán có in đậm đáp án đỏ">
                     <i data-lucide="file-text" class="w-4 h-4 text-blue-600"></i>
-                    <span>Tải Mẫu Đề Word</span>
+                    <span>Tải Mẫu Word (Toán)</span>
                 </a>
-                <a href="/api/download-sample-pdf" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 transition border border-rose-200 shadow-sm" title="Tải mẫu đề PDF chuẩn">
+                <a href="/api/download-sample-pdf" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 transition border border-rose-200 shadow-sm" title="Tải mẫu đề PDF (.pdf) môn Toán có in đậm đáp án đỏ">
                     <i data-lucide="file-down" class="w-4 h-4 text-rose-600"></i>
-                    <span>Tải Mẫu PDF</span>
+                    <span>Tải Mẫu PDF (Toán)</span>
                 </a>
-                <button id="btn-load-sample" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition shadow-sm" title="Nạp nhanh bộ đề mẫu Toán - Lý - Hóa có sẵn để trải nghiệm">
+                <button id="btn-load-sample" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition shadow-sm" title="Nạp nhanh đề thi mẫu môn Toán có in đậm đáp án đỏ">
                     <i data-lucide="zap" class="w-4 h-4"></i>
-                    <span>⚡ Thử Đề Mẫu Ngay</span>
+                    <span>⚡ Thử Đề Toán Mẫu</span>
                 </button>
             </div>
         </div>
@@ -98,8 +99,25 @@
                     </div>
                     <div class="flex flex-wrap items-center justify-center gap-2 pt-2 text-xs text-slate-600">
                         <span class="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 font-medium">✓ Nhận diện 4 phần I, II, III, IV</span>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-medium">✓ Tự động nhận đáp án tô đỏ</span>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">✓ Bảo toàn công thức H₂SO₄, Fe³⁺, OMML, Ω, λ</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-bold">✓ Tự động nhận đáp án IN ĐẬM ĐỎ</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">✓ Bảo toàn công thức Toán 12</span>
+                    </div>
+
+                    <!-- Quick Sample Picker in Dropzone -->
+                    <div class="pt-4 mt-2 border-t border-slate-100 flex flex-wrap items-center justify-center gap-2 text-xs">
+                        <span class="font-medium text-slate-600">Chưa có file? Tải đề mẫu Toán (in đậm đáp án đỏ):</span>
+                        <a href="/api/download-sample-docx" onclick="event.stopPropagation();" class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition" title="Tải mẫu đề Word môn Toán">
+                            <i data-lucide="file-text" class="w-3.5 h-3.5 text-blue-600"></i>
+                            <span>Mẫu Word (.docx)</span>
+                        </a>
+                        <a href="/api/download-sample-pdf" onclick="event.stopPropagation();" class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition" title="Tải mẫu đề PDF môn Toán">
+                            <i data-lucide="file-down" class="w-3.5 h-3.5 text-rose-600"></i>
+                            <span>Mẫu PDF (.pdf)</span>
+                        </a>
+                        <button id="btn-load-sample-hero" type="button" onclick="event.stopPropagation();" class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold bg-amber-500 hover:bg-amber-600 text-white transition shadow-sm" title="Nạp nhanh đề mẫu Toán">
+                            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                            <span>Nạp Thử Ngay</span>
+                        </button>
                     </div>
                 </div>
             </div>

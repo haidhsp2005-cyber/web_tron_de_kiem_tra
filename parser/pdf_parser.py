@@ -8,6 +8,7 @@ PART3_REGEX = re.compile(r"^\s*PH[^\s]*N\s+(III|3)[\.\:\s\-]", re.IGNORECASE)
 PART4_REGEX = re.compile(r"^\s*PH[^\s]*N\s+(IV|4)[\.\:\s\-]", re.IGNORECASE)
 QUESTION_REGEX = re.compile(r"^\s*(C[^\s]*u|B[^\s]*i)\s+(\d+)[\.\:\-\s]", re.IGNORECASE)
 CHOICE_SPLIT_REGEX = re.compile(r"(?=(?:^|\s{2,}|\t)([A-D])[\.\:\)])")
+STOP_MARKER_REGEX = re.compile(r"(B[^\s]*NG\s+[^\s]*[AÁ]P\s+[AÁ]N|H[^\s]*NG\s+D[^\s]*N\s+CH[^\s]*M\s+(ĐỀ|MẪU|CHI\s+TIẾT|THI|\-\-)|\-\-+.*H[^\s]*T)", re.IGNORECASE)
 
 def is_rgb_red(color_int: int) -> bool:
     """Check if sRGB integer color is in red range."""
@@ -45,9 +46,11 @@ def smart_join_lines(lines: list[str]) -> str:
             prev.startswith(("print(", "return ", "def ", "for ", "while ", "if ", "else:", "elif ", "import "))
         )
         
+        is_guide_or_ans = bool(re.match(r"^(?:H[^\s]*ng\s*d[^\s]*n\s*ch[^\s]*m|HD\s*ch[^\s]*m|Lời\s*giải|[^\s]*áp\s*án)[\:\s]*", curr, re.IGNORECASE))
+        
         if prev.endswith("-") and not prev_is_colon and not curr_is_bullet and len(prev) > 1 and prev[-2].isalpha():
             result = result[:-1] + curr
-        elif prev_is_colon or curr_is_bullet or is_code:
+        elif prev_is_colon or curr_is_bullet or is_code or is_guide_or_ans:
             result += "\n" + curr
         else:
             result += " " + curr
@@ -86,6 +89,10 @@ class PdfParser:
                 i += 1
                 continue
                 
+            # Stop if we hit end-of-exam marker or trailing separate answer key section
+            if (len(self.part1_questions) > 0 or len(self.part2_questions) > 0) and STOP_MARKER_REGEX.search(text):
+                break
+
             if PART1_REGEX.search(text):
                 current_part = 1
                 i += 1
@@ -220,7 +227,7 @@ class PdfParser:
             if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
                 PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
                 PART4_REGEX.search(next_text) or
-                re.search(r"(BẢNG\s+ĐÁP\s+ÁN|HƯỚNG\s+DẪN\s+CHẤM|\-\-\-+\s*HẾT)", next_text, re.IGNORECASE)):
+                STOP_MARKER_REGEX.search(next_text)):
                 break
                 
             p_choices = self._extract_choices_from_pdf_p(next_p)
@@ -260,7 +267,7 @@ class PdfParser:
     def _extract_choices_from_pdf_p(self, p_data) -> dict:
         res = {}
         text = p_data["raw_text"]
-        matches = list(re.finditer(r"(?:^|\s+)([A-D])[\.\:\)]\s*", text))
+        matches = list(re.finditer(r"(?:^|\s{2,}|\t)([A-D])[\.\:\)]\s*", text))
         if not matches:
             m_single = re.match(r"^\s*([A-D])[\.\:\)]\s*(.*)", text)
             if m_single:
@@ -320,7 +327,7 @@ class PdfParser:
             if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
                 PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
                 PART4_REGEX.search(next_text) or
-                re.search(r"(BẢNG\s+ĐÁP\s+ÁN|HƯỚNG\s+DẪN\s+CHẤM|\-\-\-+\s*HẾT)", next_text, re.IGNORECASE)):
+                STOP_MARKER_REGEX.search(next_text)):
                 break
                 
             item_match = re.match(r"^\s*([a-d])[\)\.]\s*(.*)", next_text, re.IGNORECASE)
@@ -384,7 +391,7 @@ class PdfParser:
             if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
                 PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
                 PART4_REGEX.search(next_text) or
-                re.search(r"(BẢNG\s+ĐÁP\s+ÁN|HƯỚNG\s+DẪN\s+CHẤM|\-\-\-+\s*HẾT)", next_text, re.IGNORECASE)):
+                STOP_MARKER_REGEX.search(next_text)):
                 break
             lines.append(next_text)
             idx += 1
@@ -439,14 +446,14 @@ class PdfParser:
             if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
                 PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
                 PART4_REGEX.search(next_text) or
-                re.search(r"(BẢNG\s+ĐÁP\s+ÁN|HƯỚNG\s+DẪN\s+CHẤM|\-\-\-+\s*HẾT)", next_text, re.IGNORECASE)):
+                STOP_MARKER_REGEX.search(next_text)):
                 break
             lines.append(next_text)
             idx += 1
 
         full_text = smart_join_lines(lines)
 
-        parts = re.split(r"((?:^|\n)\s*(?:H[^\s]*ng\s*d[^\s]*n\s*ch[^\s]*m|HD\s*ch[^\s]*m|Lời\s*giải|[^\s]*áp\s*án)[\:\s]*)", full_text, flags=re.IGNORECASE)
+        parts = re.split(r"((?:^|\n|\s{2,}|\b)(?:H[^\s]*ng\s*d[^\s]*n\s*ch[^\s]*m|HD\s*ch[^\s]*m|Lời\s*giải|[^\s]*áp\s*án)[\:\s]*)", full_text, flags=re.IGNORECASE)
         if len(parts) >= 3:
             q_part = parts[0].strip()
             guide_part = "".join(parts[1:]).strip()

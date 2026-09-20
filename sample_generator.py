@@ -90,11 +90,12 @@ def add_part3_answer_box(doc):
     p1.paragraph_format.line_spacing = Pt(14)
     add_run(p1, "")
 
-def add_2x2_choices(doc, choices: list[tuple[str, str]]):
+def add_2x2_choices(doc, choices: list[tuple[str, str]], correct_key: str = None):
     """
     Creates a 2x2 borderless table for choices:
     Row 0: Cell 0 = A, Cell 1 = B
     Row 1: Cell 0 = C, Cell 1 = D
+    If correct_key is provided, highlights the correct choice with bold & red.
     """
     tbl = doc.add_table(rows=2, cols=2)
     tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -117,8 +118,9 @@ def add_2x2_choices(doc, choices: list[tuple[str, str]]):
         p.paragraph_format.space_before = Pt(1)
         p.paragraph_format.space_after = Pt(2)
         p.paragraph_format.line_spacing = 1.15
-        add_run(p, f"{k}. ", bold=True)
-        add_run(p, val)
+        is_corr = (k.strip().upper() == (correct_key or "").strip().upper())
+        add_run(p, f"{k}. ", bold=True, is_red=is_corr)
+        add_run(p, val, bold=is_corr, is_red=is_corr)
 
 def setup_footer(doc, code: str = "101"):
     """Sets up exam footer: left = Mã đề thi: {code}, right = Trang {PAGE}/{NUMPAGES} across all pages."""
@@ -195,11 +197,11 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
     tcPr.append(shd)
     
     ip = cell_intro.paragraphs[0]
-    add_run(ip, "📌 HƯỚNG DẪN ĐỊNH DẠNG ĐỀ THI TOÁN LỚP 12 ÔN THI TỐT NGHIỆP:", bold=True, size=Pt(11))
+    add_run(ip, "📌 HƯỚNG DẪN ĐỊNH DẠNG ĐỀ THI TOÁN LỚP 12 CÓ IN ĐẬM ĐÁP ÁN ĐỎ:", bold=True, size=Pt(11))
     
     points = [
         ("• Cấu trúc 4 phần chuẩn Bộ GD&ĐT 2025+: ", "PHẦN I (Trắc nghiệm 4 lựa chọn), PHẦN II (Trắc nghiệm Đúng/Sai), PHẦN III (Trả lời ngắn), PHẦN IV (Tự luận)."),
-        ("• Quy tắc Đề thi & Đáp án riêng biệt: ", "Nội dung đề thi cho học sinh hoàn toàn sạch sẽ, không lộ đáp án. Bảng đáp án & hướng dẫn chấm được đặt riêng ở cuối tài liệu."),
+        ("• Tự động nhận diện đáp án IN ĐẬM ĐỎ: ", "Phần I: Phương án đúng được in đậm màu đỏ. Phần II: Các ý có (Đúng)/(Sai) in đậm đỏ. Phần III: Có dòng 'Đáp án: [số]' in đậm đỏ. Phần IV: Có 'Hướng dẫn chấm' in đậm đỏ."),
         ("• Dàn 2 phương án / dòng: ", "Các câu hỏi toán được bố trí 2 phương án một dòng (A & B dòng 1; C & D dòng 2) theo đúng mẫu đề thi chính thức."),
         ("• Bảo toàn công thức Toán 12: ", "Hỗ trợ công thức số mũ (x², x³), căn số (√), tích phân (∫), vectơ (a⃗, u⃗), phân số hoàn toàn nguyên vẹn khi đảo đề.")
     ]
@@ -231,7 +233,7 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
     p01 = c01.paragraphs[0]
     p01.alignment = WD_ALIGN_PARAGRAPH.CENTER
     add_run(p01, "ĐỀ KIỂM TRA CHÍNH THỨC\n", bold=True, size=Pt(11))
-    add_run(p01, "BÀI THI: TOÁN (LỚP 12)\n", bold=True, size=Pt(12))
+    add_run(p01, "BÀI THI: TOÁN (LỚP 12) - ĐỀ MẪU CÓ ĐÁP ÁN ĐỎ\n", bold=True, size=Pt(11.5))
     add_run(p01, "Thời gian làm bài: 90 phút (không kể thời gian phát đề)\n", italic=True, size=Pt(10))
     add_run(p01, "MÃ ĐỀ GỐC: 000", bold=True, size=Pt(11.5))
 
@@ -248,16 +250,16 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
     p_info2.paragraph_format.line_spacing = 1.15
     add_run(p_info2, "Số báo danh: ....................................................", size=Pt(11))
     
-    # ==================== PHẦN I: TRẮC NGHIỆM 4 PHƯƠNG ÁN (KHÔNG CÓ ĐÁP ÁN) ====================
+    # ==================== PHẦN I: TRẮC NGHIỆM 4 PHƯƠNG ÁN (IN ĐẬM ĐÁP ÁN ĐỎ) ====================
     p_p1 = doc.add_paragraph()
     p_p1.paragraph_format.space_before = Pt(10)
     p_p1.paragraph_format.space_after = Pt(4)
     add_run(p_p1, "PHẦN I. Câu trắc nghiệm nhiều phương án lựa chọn.", bold=True, size=Pt(12.5))
     p_p1_note = doc.add_paragraph()
     p_p1_note.paragraph_format.space_after = Pt(6)
-    add_run(p_p1_note, "Thí sinh trả lời từ câu 1 đến câu 6. Mỗi câu hỏi thí sinh chỉ chọn một phương án.", italic=True)
+    add_run(p_p1_note, "Thí sinh trả lời từ câu 1 đến câu 6. Mỗi câu hỏi thí sinh chỉ chọn một phương án. (Đáp án đúng được in đậm màu đỏ)", italic=True)
     
-    # Q1: Đơn điệu hàm số
+    # Q1: Đơn điệu hàm số (B đúng)
     p_q1 = doc.add_paragraph()
     add_run(p_q1, "Câu 1: ", bold=True)
     add_run(p_q1, "Cho hàm số ")
@@ -270,9 +272,9 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
         ("B", "(2; +∞)."),
         ("C", "(0; 2)."),
         ("D", "(-∞; -1).")
-    ])
+    ], correct_key="B")
     
-    # Q2: Tiệm cận
+    # Q2: Tiệm cận (B đúng)
     p_q2 = doc.add_paragraph()
     add_run(p_q2, "Câu 2: ", bold=True)
     add_run(p_q2, "Đồ thị hàm số ")
@@ -283,9 +285,9 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
         ("B", "x = -1."),
         ("C", "y = 2."),
         ("D", "y = -1.")
-    ])
+    ], correct_key="B")
 
-    # Q3: Cực trị
+    # Q3: Cực trị (B đúng)
     p_q3 = doc.add_paragraph()
     add_run(p_q3, "Câu 3: ", bold=True)
     add_run(p_q3, "Cho hàm số ")
@@ -296,9 +298,9 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
         ("B", "N(-1; 4)."),
         ("C", "P(0; 2)."),
         ("D", "Q(2; 4).")
-    ])
+    ], correct_key="B")
 
-    # Q4: Nguyên hàm
+    # Q4: Nguyên hàm (B đúng)
     p_q4 = doc.add_paragraph()
     add_run(p_q4, "Câu 4: ", bold=True)
     add_run(p_q4, "Họ nguyên hàm của hàm số ")
@@ -309,9 +311,9 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
         ("B", "F(x) = x³ + sin x + C."),
         ("C", "F(x) = 6x + sin x + C."),
         ("D", "F(x) = x³ + cos x + C.")
-    ])
+    ], correct_key="B")
 
-    # Q5: Mặt cầu Oxyz
+    # Q5: Mặt cầu Oxyz (A đúng)
     p_q5 = doc.add_paragraph()
     add_run(p_q5, "Câu 5: ", bold=True)
     add_run(p_q5, "Trong không gian với hệ tọa độ Oxyz, cho mặt cầu (S): ")
@@ -322,9 +324,9 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
         ("B", "I(-1; 2; -3), R = 4."),
         ("C", "I(1; -2; 3), R = 16."),
         ("D", "I(-1; 2; -3), R = 16.")
-    ])
+    ], correct_key="A")
 
-    # Q6: Vectơ không gian Oxyz
+    # Q6: Vectơ không gian Oxyz (A đúng)
     p_q6 = doc.add_paragraph()
     add_run(p_q6, "Câu 6: ", bold=True)
     add_run(p_q6, "Trong không gian Oxyz, cho hai vectơ ")
@@ -339,16 +341,16 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
         ("B", "u⃗ = (3; 2; 0)."),
         ("C", "u⃗ = (5; 4; 1)."),
         ("D", "u⃗ = (4; 2; -1).")
-    ])
+    ], correct_key="A")
 
-    # ==================== PHẦN II: TRẮC NGHIỆM ĐÚNG SAI (KHÔNG CÓ ĐÁP ÁN) ====================
+    # ==================== PHẦN II: TRẮC NGHIỆM ĐÚNG SAI (IN ĐẬM ĐÁP ÁN ĐỎ) ====================
     p_p2 = doc.add_paragraph()
     p_p2.paragraph_format.space_before = Pt(12)
     p_p2.paragraph_format.space_after = Pt(4)
     add_run(p_p2, "PHẦN II. Câu trắc nghiệm đúng sai.", bold=True, size=Pt(12.5))
     p_p2_note = doc.add_paragraph()
     p_p2_note.paragraph_format.space_after = Pt(6)
-    add_run(p_p2_note, "Thí sinh trả lời từ câu 1 đến câu 2. Trong mỗi ý a), b), c), d) ở mỗi câu, thí sinh chọn Đúng hoặc Sai.", italic=True)
+    add_run(p_p2_note, "Thí sinh trả lời từ câu 1 đến câu 2. Trong mỗi ý a), b), c), d) ở mỗi câu, thí sinh chọn Đúng hoặc Sai. (Đáp án Đúng/Sai được in đậm màu đỏ)", italic=True)
     
     # Q1: Ứng dụng đạo hàm tối ưu chi phí
     p_p2_q1 = doc.add_paragraph()
@@ -360,19 +362,26 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
     p_p2_q1_a = doc.add_paragraph()
     p_p2_q1_a.paragraph_format.space_before = Pt(1)
     p_p2_q1_a.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q1_a, "a) Chi phí cố định khi chưa sản xuất sản phẩm nào (x = 0) là 500 nghìn đồng.")
+    add_run(p_p2_q1_a, "a) Chi phí cố định khi chưa sản xuất sản phẩm nào (x = 0) là 500 nghìn đồng. ")
+    add_run(p_p2_q1_a, "(Đúng)", bold=True, is_red=True)
+
     p_p2_q1_b = doc.add_paragraph()
     p_p2_q1_b.paragraph_format.space_before = Pt(1)
     p_p2_q1_b.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q1_b, "b) Chi phí biên tại mức sản lượng x = 10 là C'(10) = 100 nghìn đồng.")
+    add_run(p_p2_q1_b, "b) Chi phí biên tại mức sản lượng x = 10 là C'(10) = 100 nghìn đồng. ")
+    add_run(p_p2_q1_b, "(Đúng)", bold=True, is_red=True)
+
     p_p2_q1_c = doc.add_paragraph()
     p_p2_q1_c.paragraph_format.space_before = Pt(1)
     p_p2_q1_c.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q1_c, "c) Chi phí sản xuất trung bình cho mỗi sản phẩm luôn giảm khi số lượng sản phẩm tăng từ 0 đến 25.")
+    add_run(p_p2_q1_c, "c) Chi phí sản xuất trung bình cho mỗi sản phẩm luôn giảm khi số lượng sản phẩm tăng từ 0 đến 25. ")
+    add_run(p_p2_q1_c, "(Sai)", bold=True, is_red=True)
+
     p_p2_q1_d = doc.add_paragraph()
     p_p2_q1_d.paragraph_format.space_before = Pt(1)
     p_p2_q1_d.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q1_d, "d) Tổng chi phí sản xuất đạt giá trị nhỏ nhất khi mức sản lượng x = 20 sản phẩm.")
+    add_run(p_p2_q1_d, "d) Tổng chi phí sản xuất đạt giá trị nhỏ nhất khi mức sản lượng x = 20 sản phẩm. ")
+    add_run(p_p2_q1_d, "(Sai)", bold=True, is_red=True)
 
     # Q2: Tọa độ Oxyz tam giác và mặt phẳng
     p_p2_q2 = doc.add_paragraph()
@@ -386,83 +395,115 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
     p_p2_q2_a = doc.add_paragraph()
     p_p2_q2_a.paragraph_format.space_before = Pt(1)
     p_p2_q2_a.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q2_a, "a) Tọa độ trọng tâm G của tam giác ABC là G(1; 1; 2).")
+    add_run(p_p2_q2_a, "a) Tọa độ trọng tâm G của tam giác ABC là G(1; 1; 2). ")
+    add_run(p_p2_q2_a, "(Đúng)", bold=True, is_red=True)
+
     p_p2_q2_b = doc.add_paragraph()
     p_p2_q2_b.paragraph_format.space_before = Pt(1)
     p_p2_q2_b.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q2_b, "b) Mặt phẳng (P) có một vectơ pháp tuyến là n⃗ = (2; -1; 2).")
+    add_run(p_p2_q2_b, "b) Mặt phẳng (P) có một vectơ pháp tuyến là n⃗ = (2; -1; 2). ")
+    add_run(p_p2_q2_b, "(Đúng)", bold=True, is_red=True)
+
     p_p2_q2_c = doc.add_paragraph()
     p_p2_q2_c.paragraph_format.space_before = Pt(1)
     p_p2_q2_c.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q2_c, "c) Điểm A(1; 0; 2) nằm trên mặt phẳng (P).")
+    add_run(p_p2_q2_c, "c) Điểm A(1; 0; 2) nằm trên mặt phẳng (P). ")
+    add_run(p_p2_q2_c, "(Sai)", bold=True, is_red=True)
+
     p_p2_q2_d = doc.add_paragraph()
     p_p2_q2_d.paragraph_format.space_before = Pt(1)
     p_p2_q2_d.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q2_d, "d) Khoảng cách từ gốc tọa độ O đến mặt phẳng (P) bằng 1.")
+    add_run(p_p2_q2_d, "d) Khoảng cách từ gốc tọa độ O đến mặt phẳng (P) bằng 1. ")
+    add_run(p_p2_q2_d, "(Sai)", bold=True, is_red=True)
 
-    # ==================== PHẦN III: TRẢ LỜI NGẮN (KHÔNG CÓ ĐÁP ÁN) ====================
+    # ==================== PHẦN III: TRẢ LỜI NGẮN (IN ĐẬM ĐÁP ÁN ĐỎ) ====================
     p_p3 = doc.add_paragraph()
     p_p3.paragraph_format.space_before = Pt(12)
     p_p3.paragraph_format.space_after = Pt(4)
     add_run(p_p3, "PHẦN III. Câu trắc nghiệm trả lời ngắn.", bold=True, size=Pt(12.5))
     p_p3_note = doc.add_paragraph()
     p_p3_note.paragraph_format.space_after = Pt(6)
-    add_run(p_p3_note, "Thí sinh trả lời từ câu 1 đến câu 3. Thí sinh điền kết quả vào ô tương ứng.", italic=True)
+    add_run(p_p3_note, "Thí sinh trả lời từ câu 1 đến câu 3. Thí sinh điền kết quả vào ô tương ứng. (Đáp án được in đậm màu đỏ)", italic=True)
     
-    # Q1: GTLN
+    # Q1: GTLN (Đáp án: 9)
     p_p3_q1 = doc.add_paragraph()
     p_p3_q1.paragraph_format.space_before = Pt(3)
-    p_p3_q1.paragraph_format.space_after = Pt(3)
+    p_p3_q1.paragraph_format.space_after = Pt(1)
     add_run(p_p3_q1, "Câu 1: ", bold=True)
     add_run(p_p3_q1, "Tìm giá trị lớn nhất của hàm số ")
     add_run(p_p3_q1, "y = -x² + 4x + 5", italic=True)
     add_run(p_p3_q1, " trên đoạn [0; 3].")
-    add_part3_answer_box(doc)
+    p_ans_q1 = doc.add_paragraph()
+    p_ans_q1.paragraph_format.space_before = Pt(1)
+    p_ans_q1.paragraph_format.space_after = Pt(3)
+    add_run(p_ans_q1, "Đáp án: ", bold=True, is_red=True)
+    add_run(p_ans_q1, "9", bold=True, is_red=True)
 
-    # Q2: Tích phân
+    # Q2: Tích phân (Đáp án: 12)
     p_p3_q2 = doc.add_paragraph()
     p_p3_q2.paragraph_format.space_before = Pt(3)
-    p_p3_q2.paragraph_format.space_after = Pt(3)
+    p_p3_q2.paragraph_format.space_after = Pt(1)
     add_run(p_p3_q2, "Câu 2: ", bold=True)
     add_run(p_p3_q2, "Tính tích phân ")
     add_run(p_p3_q2, "I = ∫ (2x + 1) dx", italic=True)
     add_run(p_p3_q2, " từ 0 đến 3.")
-    add_part3_answer_box(doc)
+    p_ans_q2 = doc.add_paragraph()
+    p_ans_q2.paragraph_format.space_before = Pt(1)
+    p_ans_q2.paragraph_format.space_after = Pt(3)
+    add_run(p_ans_q2, "Đáp án: ", bold=True, is_red=True)
+    add_run(p_ans_q2, "12", bold=True, is_red=True)
 
-    # Q3: Bán kính mặt cầu Oxyz
+    # Q3: Bán kính mặt cầu Oxyz (Đáp án: 3)
     p_p3_q3 = doc.add_paragraph()
     p_p3_q3.paragraph_format.space_before = Pt(3)
-    p_p3_q3.paragraph_format.space_after = Pt(3)
+    p_p3_q3.paragraph_format.space_after = Pt(1)
     add_run(p_p3_q3, "Câu 3: ", bold=True)
     add_run(p_p3_q3, "Trong không gian Oxyz, cho mặt cầu (S) có tâm ")
     add_run(p_p3_q3, "I(1; 1; 2)", italic=True)
     add_run(p_p3_q3, " và đi qua điểm ")
     add_run(p_p3_q3, "A(2; -1; 4)", italic=True)
     add_run(p_p3_q3, ". Tính bán kính R của mặt cầu (S).")
-    add_part3_answer_box(doc)
+    p_ans_q3 = doc.add_paragraph()
+    p_ans_q3.paragraph_format.space_before = Pt(1)
+    p_ans_q3.paragraph_format.space_after = Pt(3)
+    add_run(p_ans_q3, "Đáp án: ", bold=True, is_red=True)
+    add_run(p_ans_q3, "3", bold=True, is_red=True)
 
-    # ==================== PHẦN IV: TỰ LUẬN (KHÔNG CÓ ĐÁP ÁN) ====================
+    # ==================== PHẦN IV: TỰ LUẬN (IN ĐẬM ĐÁP ÁN ĐỎ) ====================
     p_p4 = doc.add_paragraph()
     p_p4.paragraph_format.space_before = Pt(12)
     p_p4.paragraph_format.space_after = Pt(4)
     add_run(p_p4, "PHẦN IV. Câu tự luận.", bold=True, size=Pt(12.5))
     p_p4_note = doc.add_paragraph()
     p_p4_note.paragraph_format.space_after = Pt(6)
-    add_run(p_p4_note, "Thí sinh trình bày chi tiết lời giải vào giấy làm bài.", italic=True)
+    add_run(p_p4_note, "Thí sinh trình bày chi tiết lời giải vào giấy làm bài. (Hướng dẫn chấm được in đậm màu đỏ)", italic=True)
     
     # Q1: Khối chóp không gian Oxyz
     p_p4_q1 = doc.add_paragraph()
     p_p4_q1.paragraph_format.space_before = Pt(3)
-    p_p4_q1.paragraph_format.space_after = Pt(3)
+    p_p4_q1.paragraph_format.space_after = Pt(2)
     add_run(p_p4_q1, "Câu 1 (1,5 điểm): ", bold=True)
     add_run(p_p4_q1, "Cho hình chóp S.ABCD có đáy ABCD là hình vuông cạnh a, cạnh bên SA vuông góc với mặt phẳng đáy và SA = a√3. Tính theo a thể tích khối chóp S.ABCD.")
+    p_p4_q1_gd = doc.add_paragraph()
+    p_p4_q1_gd.paragraph_format.space_before = Pt(1)
+    p_p4_q1_gd.paragraph_format.space_after = Pt(3)
+    add_run(p_p4_q1_gd, "Hướng dẫn chấm:\n", bold=True, is_red=True)
+    add_run(p_p4_q1_gd, "• Diện tích đáy hình vuông: S_ABCD = a² (0,5 điểm).\n", is_red=True)
+    add_run(p_p4_q1_gd, "• Chiều cao hình chóp: h = SA = a√3 (0,5 điểm).\n", is_red=True)
+    add_run(p_p4_q1_gd, "• Thể tích: V = (1/3) * S_ABCD * h = (a³√3)/3 (0,5 điểm).", bold=True, is_red=True)
 
     # Q2: Ứng dụng tích phân tính quãng đường
     p_p4_q2 = doc.add_paragraph()
     p_p4_q2.paragraph_format.space_before = Pt(3)
-    p_p4_q2.paragraph_format.space_after = Pt(3)
+    p_p4_q2.paragraph_format.space_after = Pt(2)
     add_run(p_p4_q2, "Câu 2 (1,0 điểm): ", bold=True)
     add_run(p_p4_q2, "Một ô tô đang chạy với vận tốc v₀ = 10 m/s thì người lái xe đạp phanh; từ thời điểm đó ô tô chuyển động chậm dần đều với gia tốc a(t) = -2t (m/s²). Tính quãng đường s ô tô di chuyển được từ lúc đạp phanh đến khi dừng hẳn.")
+    p_p4_q2_gd = doc.add_paragraph()
+    p_p4_q2_gd.paragraph_format.space_before = Pt(1)
+    p_p4_q2_gd.paragraph_format.space_after = Pt(3)
+    add_run(p_p4_q2_gd, "Hướng dẫn chấm:\n", bold=True, is_red=True)
+    add_run(p_p4_q2_gd, "• Vận tốc v(t) = 10 - t² (m/s). Xe dừng lại khi v(t) = 0 <=> t = √10 (s) (0,5 điểm).\n", is_red=True)
+    add_run(p_p4_q2_gd, "• Quãng đường: s = ∫(10 - t²)dt từ 0 đến √10 = (20√10)/3 ≈ 21,08 mét (0,5 điểm).", bold=True, is_red=True)
 
     # Student exam footer
     p_end = doc.add_paragraph()
@@ -637,116 +678,123 @@ def create_sample_pdf_from_docx(docx_path="samples/de_thi_mau_chuan.docx", pdf_p
     c_blue = (0.1, 0.3, 0.6)
     c_gray = (0.4, 0.4, 0.4)
     
-    # ---------------- PAGE 1: STUDENT EXAM (CLEAN) ----------------
+    # ---------------- PAGE 1: EXAM WITH BOLD RED ANSWERS ----------------
     page1 = doc_pdf.new_page(width=595, height=842)
-    page1.insert_text((40, 35), "SỞ GIÁO DỤC VÀ ĐÀO TẠO              KỲ THI THỬ TỐT NGHIỆP THPT NĂM HỌC 2026 - 2027", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((40, 48), "TRƯỜNG THPT LONG CANG               BÀI THI: TOÁN (LỚP 12) - THỜI GIAN: 90 PHÚT", fontsize=9, fontfile=font_bold, color=c_blue)
-    page1.draw_line((40, 56), (555, 56), color=c_gray, width=0.7)
+    page1.insert_text((40, 32), "SỞ GIÁO DỤC VÀ ĐÀO TẠO              KỲ THI THỬ TỐT NGHIỆP THPT NĂM HỌC 2026 - 2027", fontsize=9, fontfile=font_bold, color=c_black)
+    page1.insert_text((40, 45), "TRƯỜNG THPT LONG CANG               BÀI THI: TOÁN (LỚP 12) - ĐỀ MẪU CÓ ĐÁP ÁN ĐỎ", fontsize=9, fontfile=font_bold, color=c_blue)
+    page1.draw_line((40, 52), (555, 52), color=c_gray, width=0.7)
     
-    y = 70
+    y = 65
     page1.insert_text((40, y), "Họ và tên thí sinh: .....................................................................     Lớp: .......................   MÃ ĐỀ: 000", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 18
+    y += 16
     
     # PHẦN I
-    page1.insert_text((40, y), "PHẦN I. Câu trắc nghiệm nhiều phương án lựa chọn (Chọn một phương án đúng)", fontsize=10, fontfile=font_bold, color=c_black)
+    page1.insert_text((40, y), "PHẦN I. Câu trắc nghiệm nhiều phương án lựa chọn (Đáp án đúng in đậm màu đỏ)", fontsize=9.5, fontfile=font_bold, color=c_black)
+    y += 13
+    page1.insert_text((40, y), "Câu 1: Hàm số y = f(x) có f'(x) = x(x - 2)(x + 1). Hàm số đồng biến trên khoảng nào?", fontsize=8.5, fontfile=font_regular, color=c_black)
+    y += 11
+    page1.insert_text((55, y), "A. (-1; 0).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((300, y), "B. (2; +∞).", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 11
+    page1.insert_text((55, y), "C. (0; 2).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((300, y), "D. (-∞; -1).", fontsize=8.5, fontfile=font_bold, color=c_black)
     y += 14
-    page1.insert_text((40, y), "Câu 1: Hàm số y = f(x) có f'(x) = x(x - 2)(x + 1). Hàm số đồng biến trên khoảng nào?", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "A. (-1; 0).", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "B. (2; +∞).", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "C. (0; 2).", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. (-∞; -1).", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 16
     
-    page1.insert_text((40, y), "Câu 2: Đồ thị hàm số y = (2x - 1)/(x + 1) có đường tiệm cận đứng là:", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "A. x = 2.", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "B. x = -1.", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "C. y = 2.", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. y = -1.", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 16
+    page1.insert_text((40, y), "Câu 2: Đồ thị hàm số y = (2x - 1)/(x + 1) có đường tiệm cận đứng là:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    y += 11
+    page1.insert_text((55, y), "A. x = 2.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((300, y), "B. x = -1.", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 11
+    page1.insert_text((55, y), "C. y = 2.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((300, y), "D. y = -1.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    y += 14
 
-    page1.insert_text((40, y), "Câu 3: Điểm cực đại của đồ thị hàm số y = x³ - 3x + 2 là:", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "A. M(1; 0).", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "B. N(-1; 4).", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "C. P(0; 2).", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. Q(2; 4).", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 16
+    page1.insert_text((40, y), "Câu 3: Điểm cực đại của đồ thị hàm số y = x³ - 3x + 2 là:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    y += 11
+    page1.insert_text((55, y), "A. M(1; 0).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((300, y), "B. N(-1; 4).", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 11
+    page1.insert_text((55, y), "C. P(0; 2).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((300, y), "D. Q(2; 4).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    y += 14
 
-    page1.insert_text((40, y), "Câu 4: Họ nguyên hàm của hàm số f(x) = 3x² + cos x là:", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "A. F(x) = x³ - sin x + C.", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "B. F(x) = x³ + sin x + C.", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "C. F(x) = 6x + sin x + C.", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. F(x) = x³ + cos x + C.", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 16
+    page1.insert_text((40, y), "Câu 4: Họ nguyên hàm của hàm số f(x) = 3x² + cos x là:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    y += 11
+    page1.insert_text((55, y), "A. F(x) = x³ - sin x + C.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((300, y), "B. F(x) = x³ + sin x + C.", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 11
+    page1.insert_text((55, y), "C. F(x) = 6x + sin x + C.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((300, y), "D. F(x) = x³ + cos x + C.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    y += 14
 
-    page1.insert_text((40, y), "Câu 5: Mặt cầu (S): (x - 1)² + (y + 2)² + (z - 3)² = 16 có tâm I và bán kính R là:", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "A. I(1; -2; 3), R = 4.", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "B. I(-1; 2; -3), R = 4.", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "C. I(1; -2; 3), R = 16.", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. I(-1; 2; -3), R = 16.", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 16
+    page1.insert_text((40, y), "Câu 5: Mặt cầu (S): (x - 1)² + (y + 2)² + (z - 3)² = 16 có tâm I và bán kính R là:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    y += 11
+    page1.insert_text((55, y), "A. I(1; -2; 3), R = 4.", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((300, y), "B. I(-1; 2; -3), R = 4.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    y += 11
+    page1.insert_text((55, y), "C. I(1; -2; 3), R = 16.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((300, y), "D. I(-1; 2; -3), R = 16.", fontsize=8.5, fontfile=font_bold, color=c_black)
+    y += 14
 
-    page1.insert_text((40, y), "Câu 6: Trong không gian Oxyz, cho a⃗ = (1; 2; -1) và b⃗ = (2; 0; 1). Tọa độ u⃗ = a⃗ + 2b⃗ là:", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "A. u⃗ = (5; 2; 1).", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "B. u⃗ = (3; 2; 0).", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 12
-    page1.insert_text((55, y), "C. u⃗ = (5; 4; 1).", fontsize=9, fontfile=font_bold, color=c_black)
-    page1.insert_text((300, y), "D. u⃗ = (4; 2; -1).", fontsize=9, fontfile=font_bold, color=c_black)
-    y += 20
+    page1.insert_text((40, y), "Câu 6: Trong không gian Oxyz, cho a⃗ = (1; 2; -1) và b⃗ = (2; 0; 1). Tọa độ u⃗ = a⃗ + 2b⃗ là:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    y += 11
+    page1.insert_text((55, y), "A. u⃗ = (5; 2; 1).", fontsize=8.5, fontfile=font_bold, color=c_red)
+    page1.insert_text((300, y), "B. u⃗ = (3; 2; 0).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    y += 11
+    page1.insert_text((55, y), "C. u⃗ = (5; 4; 1).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    page1.insert_text((300, y), "D. u⃗ = (4; 2; -1).", fontsize=8.5, fontfile=font_bold, color=c_black)
+    y += 16
 
     # PHẦN II
-    page1.insert_text((40, y), "PHẦN II. Câu trắc nghiệm đúng sai (Trong mỗi ý a, b, c, d chọn Đúng hoặc Sai)", fontsize=10, fontfile=font_bold, color=c_black)
-    y += 14
-    page1.insert_text((40, y), "Câu 1: Cho hàm tổng chi phí C(x) = x³ - 30x² + 400x + 500 (nghìn đồng) với 0 ≤ x ≤ 25:", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 11
-    page1.insert_text((55, y), "a) Chi phí cố định khi x = 0 là 500 nghìn đồng.", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 11
-    page1.insert_text((55, y), "b) Chi phí biên tại mức sản lượng x = 10 là C'(10) = 100 nghìn đồng.", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 11
-    page1.insert_text((55, y), "c) Chi phí trung bình luôn giảm khi sản lượng tăng từ 0 đến 25.", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 11
-    page1.insert_text((55, y), "d) Tổng chi phí sản xuất nhỏ nhất khi x = 20 sản phẩm.", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 16
+    page1.insert_text((40, y), "PHẦN II. Câu trắc nghiệm đúng sai (Ý Đúng/Sai in đậm màu đỏ)", fontsize=9.5, fontfile=font_bold, color=c_black)
+    y += 13
+    page1.insert_text((40, y), "Câu 1: Cho hàm tổng chi phí C(x) = x³ - 30x² + 400x + 500 (nghìn đồng) với 0 ≤ x ≤ 25:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    y += 10
+    page1.insert_text((55, y), "a) Chi phí cố định khi x = 0 là 500 nghìn đồng. (Đúng)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 10
+    page1.insert_text((55, y), "b) Chi phí biên tại mức sản lượng x = 10 là C'(10) = 100 nghìn đồng. (Đúng)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 10
+    page1.insert_text((55, y), "c) Chi phí trung bình luôn giảm khi sản lượng tăng từ 0 đến 25. (Sai)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 10
+    page1.insert_text((55, y), "d) Tổng chi phí sản xuất nhỏ nhất khi x = 20 sản phẩm. (Sai)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 13
 
-    page1.insert_text((40, y), "Câu 2: Trong không gian Oxyz, cho A(1; 0; 2), B(-1; 1; 3), C(3; 2; 1) và (P): 2x - y + 2z - 5 = 0:", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 11
-    page1.insert_text((55, y), "a) Trọng tâm G của tam giác ABC là G(1; 1; 2).", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 11
-    page1.insert_text((55, y), "b) Mặt phẳng (P) có vectơ pháp tuyến n⃗ = (2; -1; 2).", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 11
-    page1.insert_text((55, y), "c) Điểm A(1; 0; 2) nằm trên mặt phẳng (P).", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 11
-    page1.insert_text((55, y), "d) Khoảng cách từ O đến mặt phẳng (P) bằng 1.", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 20
+    page1.insert_text((40, y), "Câu 2: Trong không gian Oxyz, cho A(1; 0; 2), B(-1; 1; 3), C(3; 2; 1) và (P): 2x - y + 2z - 5 = 0:", fontsize=8.5, fontfile=font_regular, color=c_black)
+    y += 10
+    page1.insert_text((55, y), "a) Trọng tâm G của tam giác ABC là G(1; 1; 2). (Đúng)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 10
+    page1.insert_text((55, y), "b) Mặt phẳng (P) có vectơ pháp tuyến n⃗ = (2; -1; 2). (Đúng)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 10
+    page1.insert_text((55, y), "c) Điểm A(1; 0; 2) nằm trên mặt phẳng (P). (Sai)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 10
+    page1.insert_text((55, y), "d) Khoảng cách từ O đến mặt phẳng (P) bằng 1. (Sai)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 15
 
     # PHẦN III
-    page1.insert_text((40, y), "PHẦN III. Câu trắc nghiệm trả lời ngắn", fontsize=10, fontfile=font_bold, color=c_black)
-    y += 13
-    page1.insert_text((40, y), "Câu 1: Tìm giá trị lớn nhất của hàm số y = -x² + 4x + 5 trên [0; 3].", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 13
-    page1.insert_text((40, y), "Câu 2: Tính tích phân I = ∫(2x + 1)dx từ 0 đến 3.", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 13
-    page1.insert_text((40, y), "Câu 3: Mặt cầu (S) tâm I(1; 1; 2) đi qua A(2; -1; 4) có bán kính R bằng bao nhiêu?", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 20
+    page1.insert_text((40, y), "PHẦN III. Câu trắc nghiệm trả lời ngắn (Đáp án in đậm màu đỏ)", fontsize=9.5, fontfile=font_bold, color=c_black)
+    y += 12
+    page1.insert_text((40, y), "Câu 1: Tìm giá trị lớn nhất của hàm số y = -x² + 4x + 5 trên [0; 3].", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((370, y), "Đáp án: 9", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 12
+    page1.insert_text((40, y), "Câu 2: Tính tích phân I = ∫(2x + 1)dx từ 0 đến 3.", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((370, y), "Đáp án: 12", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 12
+    page1.insert_text((40, y), "Câu 3: Mặt cầu (S) tâm I(1; 1; 2) đi qua A(2; -1; 4) có bán kính R bằng bao nhiêu?", fontsize=8.5, fontfile=font_regular, color=c_black)
+    page1.insert_text((370, y), "Đáp án: 3", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 15
 
     # PHẦN IV
-    page1.insert_text((40, y), "PHẦN IV. Câu tự luận", fontsize=10, fontfile=font_bold, color=c_black)
-    y += 13
-    page1.insert_text((40, y), "Câu 1 (1,5 điểm): Cho hình chóp S.ABCD có đáy là hình vuông cạnh a, SA ⊥ (ABCD) và SA = a√3. Tính theo a thể tích V.", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 13
-    page1.insert_text((40, y), "Câu 2 (1,0 điểm): Một ô tô chạy v₀ = 10 m/s đạp phanh với a(t) = -2t (m/s²). Tính quãng đường đến khi dừng hẳn.", fontsize=9, fontfile=font_regular, color=c_black)
-    y += 20
-    page1.insert_text((220, y), "------------------ HẾT ------------------", fontsize=9, fontfile=font_bold, color=c_black)
+    page1.insert_text((40, y), "PHẦN IV. Câu tự luận (Hướng dẫn chấm in đậm màu đỏ)", fontsize=9.5, fontfile=font_bold, color=c_black)
+    y += 12
+    page1.insert_text((40, y), "Câu 1 (1,5 điểm): Cho hình chóp S.ABCD đáy là hình vuông cạnh a, SA ⊥ (ABCD) và SA = a√3. Tính theo a thể tích V.", fontsize=8.5, fontfile=font_regular, color=c_black)
+    y += 10
+    page1.insert_text((55, y), "Hướng dẫn chấm: V = (1/3) * a² * a√3 = (a³√3)/3 (1,5 điểm)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 12
+    page1.insert_text((40, y), "Câu 2 (1,0 điểm): Một ô tô chạy v₀ = 10 m/s đạp phanh với a(t) = -2t (m/s²). Tính quãng đường đến khi dừng hẳn.", fontsize=8.5, fontfile=font_regular, color=c_black)
+    y += 10
+    page1.insert_text((55, y), "Hướng dẫn chấm: Dừng khi v(t) = 0 <=> t = √10; s = ∫(10 - t²)dt = (20√10)/3 ≈ 21,08 mét (1,0 điểm)", fontsize=8.5, fontfile=font_bold, color=c_red)
+    y += 16
+    page1.insert_text((220, y), "------------------ HẾT ------------------", fontsize=8.5, fontfile=font_bold, color=c_black)
 
     # ---------------- PAGE 2: SEPARATE ANSWER KEY ----------------
     page2 = doc_pdf.new_page(width=595, height=842)

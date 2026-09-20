@@ -101,9 +101,18 @@ function initEvents() {
     }
 
     // 1-Click Sample Exam Loader
-    document.getElementById("btn-load-sample").addEventListener("click", () => {
-        loadSampleExam();
-    });
+    const btnLoadSample = document.getElementById("btn-load-sample");
+    if (btnLoadSample) {
+        btnLoadSample.addEventListener("click", () => {
+            loadSampleExam();
+        });
+    }
+    const btnLoadSampleHero = document.getElementById("btn-load-sample-hero");
+    if (btnLoadSampleHero) {
+        btnLoadSampleHero.addEventListener("click", () => {
+            loadSampleExam();
+        });
+    }
 
     // Save Exam
     document.getElementById("btn-save-exam").addEventListener("click", () => {
@@ -173,7 +182,7 @@ async function loadSampleExam() {
         currentExamData = data.exam_data;
 
         renderExamEditor(currentExamData, currentFilename);
-        showToast("Đã nạp bộ đề mẫu Toán - Lý - Hóa chuẩn thành công!", true);
+        showToast("Đã nạp thành công Đề thi mẫu môn Toán (in đậm đáp án đỏ)!", true);
     } catch (err) {
         showToast("Không thể tải đề mẫu: " + err.message, false);
         dropzone.classList.remove("hidden");
