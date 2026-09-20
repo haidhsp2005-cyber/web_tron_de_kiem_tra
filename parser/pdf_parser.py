@@ -321,10 +321,20 @@ class PdfParser:
 
         clean_q = full_text
         answer = ""
-        ans_match = re.search(r"(?:[^\s]*áp\s*án|Đáp\s*án)[\:\s]+([^\n]+)", full_text, re.IGNORECASE)
+        ans_pattern = (
+            r"(?:"
+            r"(?:<br>|\n|^|\s{2,}|\b)(?:[^\s]*áp\s*án|Đáp\s*án)\s*[:=]?\s*([^\n\r]+)|"
+            r"(?:<br>|\n|^|\s{2,}|\b)(?:Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]\s*([^\n\r]+)|"
+            r"(?:<br>|\n|^)\s*(?:Kết\s*quả|KQ)\s*[:=]\s*([^\n\r?]+)"
+            r")"
+        )
+        ans_match = re.search(ans_pattern, full_text, re.IGNORECASE)
         if ans_match:
-            answer = ans_match.group(1).strip()
-            clean_q = re.sub(r"(?:[^\s]*áp\s*án|Đáp\s*án)[\:\s]+[^\n]+", "", clean_q, flags=re.IGNORECASE).strip()
+            cand_ans = (ans_match.group(1) or ans_match.group(2) or ans_match.group(3) or "").strip()
+            if cand_ans and not any(k in cand_ans.upper() for k in ["CÂU ", "PHẦN ", "BÀI "]):
+                answer = cand_ans
+            clean_q = (full_text[:ans_match.start()] + full_text[ans_match.end():]).strip()
+            clean_q = re.sub(r"(<br>|\n)+$", "", clean_q).strip()
         else:
             if p_data["has_red"]:
                 for sp in p_data["spans"]:

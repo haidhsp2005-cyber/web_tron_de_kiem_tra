@@ -149,9 +149,14 @@ class DocxParser:
                 text, is_red = extract_element_text_with_formatting(child)
                 if text:
                     formatted_parts.append(text)
-                    raw_parts.append(re.sub(r"<[^>]+>", "", text))
+                    raw_text_part = re.sub(r"<br\s*/?>", "\n", text)
+                    raw_parts.append(re.sub(r"<[^>]+>", "", raw_text_part))
                 if is_red:
                     has_red = True
+                oxml_elements.append(child)
+            elif tag in ["br", "cr"]:
+                formatted_parts.append("<br>")
+                raw_parts.append("\n")
                 oxml_elements.append(child)
 
         return {
@@ -430,15 +435,24 @@ class DocxParser:
         # Extract answer: either after "Đáp án:" or red runs
         clean_q = full_text
         answer = ""
-        ans_match = re.search(r"(?:Đáp\s*án|Đ/a|ĐA|ĐÁP\s*ÁN|KẾT\s*QUẢ|KQ)[\:\=\s]*(?:\<br\>|\n|\s)*([^\n\<]+)", full_text, re.IGNORECASE)
+        ans_pattern = (
+            r"(?:"
+            r"(?:<br>|\n|^|\s{2,}|\b)(?:Đáp\s*án)\s*[:=]?\s*([^\n<]+)|"
+            r"(?:<br>|\n|^|\s{2,}|\b)(?:Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]\s*([^\n<]+)|"
+            r"(?:<br>|\n|^)\s*(?:Kết\s*quả|KQ)\s*[:=]\s*([^\n<?]+)"
+            r")"
+        )
+        ans_match = re.search(ans_pattern, full_text, re.IGNORECASE)
         if ans_match:
-            cand_ans = ans_match.group(1).strip()
-            if not any(k in cand_ans.upper() for k in ["CÂU ", "PHẦN ", "BÀI "]):
+            cand_ans = (ans_match.group(1) or ans_match.group(2) or ans_match.group(3) or "").strip()
+            if cand_ans and not any(k in cand_ans.upper() for k in ["CÂU ", "PHẦN ", "BÀI "]):
                 answer = cand_ans
-            clean_q = re.sub(r"(\<br\>)?\s*(?:Đáp\s*án|Đ/a|ĐA|ĐÁP\s*ÁN|KẾT\s*QUẢ|KQ)[\:\=\s]*(?:\<br\>|\n|\s)*.*", "", clean_q, flags=re.IGNORECASE).strip()
+            # Remove ONLY the matched answer line from question text
+            clean_q = (full_text[:ans_match.start()] + full_text[ans_match.end():]).strip()
+            clean_q = re.sub(r"(<br>)+$", "", clean_q).strip()
         else:
-            # Clean bare "Đáp án:" if it was an empty student box
-            clean_q = re.sub(r"(\<br\>)?\s*(?:Đáp\s*án|Đ/a|ĐA|ĐÁP\s*ÁN|KẾT\s*QUẢ|KQ)[\:\=\s]*", "", clean_q, flags=re.IGNORECASE).strip()
+            # Clean bare "Đáp án:" if it was an empty student box at end of question
+            clean_q = re.sub(r"(?:<br>|\n)?\s*(?:Đáp\s*án\s*[:=]?|(?:Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=])\s*$", "", clean_q, flags=re.IGNORECASE).strip()
             # Check red elements in paragraph
             if p_data["has_red"]:
                 for run_elem in p_data["oxml_elements"]:
@@ -448,9 +462,10 @@ class DocxParser:
                         break
 
         # Strip answer from clean_q_xmls so student exam NEVER contains the answer
-        clean_q_xmls, removed_ans = strip_elements_suffix(clean_q_xmls, r"(Đáp\s*án|Đ/a|ĐA|ĐÁP\s*ÁN|KẾT\s*QUẢ|KQ)\s*[\:\=\s]?")
+        safe_suffix_pattern = r"((?:^|\n|\s{2,}|\b)(?:Đáp\s*án\s*[:=]?|(?:Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]))"
+        clean_q_xmls, removed_ans = strip_elements_suffix(clean_q_xmls, safe_suffix_pattern)
         if removed_ans and not answer:
-            m_a = re.search(r"(?:Đáp\s*án|Đ/a|ĐA|ĐÁP\s*ÁN|KẾT\s*QUẢ|KQ)[\:\=\s]*(?:\<br\>|\n|\s)*([^\n\<]+)", removed_ans, re.IGNORECASE)
+            m_a = re.search(r"(?:Đáp\s*án|Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]?\s*([^\n<]+)", removed_ans, re.IGNORECASE)
             if m_a:
                 answer = m_a.group(1).strip()
 
@@ -490,7 +505,7 @@ class DocxParser:
             idx += 1
 
         # Separate question and grading guide / answer if marked
-        parts = re.split(r"(Hướng\s*dẫn\s*chấm[\:\s\n]*|Đáp\s*án[\:\s\n]*|Lời\s*giải[\:\s\n]*)", full_text, flags=re.IGNORECASE)
+        parts = re.split(r"((?:<br>|\n|^)\s*(?:Hướng\s*dẫn\s*chấm|HD\s*chấm|Lời\s*giải|HƯỚNG\s*DẪN\s*CHẤM|Đáp\s*án)\s*[:=\n])", full_text, flags=re.IGNORECASE)
         if len(parts) >= 3:
             q_part = parts[0].strip()
             guide_part = "".join(parts[1:]).strip()
@@ -499,7 +514,7 @@ class DocxParser:
             guide_part = ""
 
         # Strip grading guide from clean_q_xmls so student exam NEVER contains solutions
-        clean_q_xmls, removed_guide = strip_elements_suffix(clean_q_xmls, r"(Hướng\s*dẫn\s*chấm|HD\s*chấm|Đáp\s*án|Lời\s*giải|HƯỚNG\s*DẪN\s*CHẤM)\s*[\:\=\s\n]")
+        clean_q_xmls, removed_guide = strip_elements_suffix(clean_q_xmls, r"((?:^|\n|\s{2,}|\b)(?:Hướng\s*dẫn\s*chấm|HD\s*chấm|Lời\s*giải|HƯỚNG\s*DẪN\s*CHẤM|Đáp\s*án)\s*[\:\=\s\n])")
         if removed_guide and not guide_part:
             guide_part = removed_guide.strip()
 

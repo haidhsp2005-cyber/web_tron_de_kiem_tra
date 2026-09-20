@@ -209,9 +209,14 @@ def extract_element_text_with_formatting(elem) -> tuple[str, bool]:
         
         # Get text
         texts = []
-        for t in elem.findall(qn("w:t")):
-            if t.text:
-                texts.append(t.text)
+        for child in elem:
+            c_tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+            if c_tag == "t" and child.text:
+                texts.append(child.text)
+            elif c_tag in ["br", "cr"]:
+                texts.append("<br>")
+            elif c_tag == "tab":
+                texts.append("    ")
         txt = "".join(texts)
         
         if valign == "subscript":
