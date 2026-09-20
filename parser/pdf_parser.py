@@ -16,6 +16,44 @@ def is_rgb_red(color_int: int) -> bool:
     b = color_int & 255
     return r >= 170 and g <= 90 and b <= 90
 
+def smart_join_lines(lines: list[str]) -> str:
+    """
+    Intelligently joins multi-line text extracted from PDF:
+    - Normal prose lines that wrapped across margins are joined with a space.
+    - Lines ending in colon ':', bullet points ('-', '•', numbers), or code statements are joined with newline '\n'.
+    """
+    if not lines:
+        return ""
+    clean_lines = [l.strip() for l in lines if l and l.strip()]
+    if not clean_lines:
+        return ""
+    if len(clean_lines) == 1:
+        return clean_lines[0]
+        
+    result = clean_lines[0]
+    for i in range(1, len(clean_lines)):
+        prev = clean_lines[i - 1]
+        curr = clean_lines[i]
+        
+        prev_is_colon = prev.endswith(":") or prev.endswith("：")
+        curr_is_bullet = bool(re.match(r"^(\-|\•|\+|\*|\–|[a-d]\)|\d+[\.\)])\s*", curr))
+        
+        is_code = (
+            bool(re.match(r"^[a-zA-Z_]\w*\s*[\+\-\*\/\%]?\s*=", curr)) or
+            bool(re.match(r"^[a-zA-Z_]\w*\s*[\+\-\*\/\%]?\s*=", prev)) or
+            curr.startswith(("print(", "return ", "def ", "for ", "while ", "if ", "else:", "elif ", "import ")) or
+            prev.startswith(("print(", "return ", "def ", "for ", "while ", "if ", "else:", "elif ", "import "))
+        )
+        
+        if prev.endswith("-") and not prev_is_colon and not curr_is_bullet and len(prev) > 1 and prev[-2].isalpha():
+            result = result[:-1] + curr
+        elif prev_is_colon or curr_is_bullet or is_code:
+            result += "\n" + curr
+        else:
+            result += " " + curr
+            
+    return result
+
 class PdfParser:
     def __init__(self, file_path: str):
         self.file_path = file_path
@@ -338,16 +376,20 @@ class PdfParser:
         q_match = QUESTION_REGEX.search(raw_text)
         q_num = int(q_match.group(2)) if q_match else len(self.part3_questions) + 1
         
-        full_text = raw_text
+        lines = [raw_text]
         idx = start_idx + 1
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
             next_text = next_p["raw_text"].strip()
-            if QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or PART4_REGEX.search(next_text):
+            if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
+                PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
+                PART4_REGEX.search(next_text) or
+                re.search(r"(BẢNG\s+ĐÁP\s+ÁN|HƯỚNG\s+DẪN\s+CHẤM|\-\-\-+\s*HẾT)", next_text, re.IGNORECASE)):
                 break
-            full_text += "\n" + next_text
+            lines.append(next_text)
             idx += 1
 
+        full_text = smart_join_lines(lines)
         clean_q = full_text
         answer = ""
         ans_pattern = (
@@ -389,17 +431,22 @@ class PdfParser:
         q_match = QUESTION_REGEX.search(raw_text)
         q_num = int(q_match.group(2)) if q_match else len(self.part4_questions) + 1
         
-        full_text = raw_text
+        lines = [raw_text]
         idx = start_idx + 1
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
             next_text = next_p["raw_text"].strip()
-            if QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or PART4_REGEX.search(next_text):
+            if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
+                PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
+                PART4_REGEX.search(next_text) or
+                re.search(r"(BẢNG\s+ĐÁP\s+ÁN|HƯỚNG\s+DẪN\s+CHẤM|\-\-\-+\s*HẾT)", next_text, re.IGNORECASE)):
                 break
-            full_text += "\n" + next_text
+            lines.append(next_text)
             idx += 1
 
-        parts = re.split(r"(H[^\s]*ng\s*d[^\s]*n\s*ch[^\s]*m[\:\s]*|[^\s]*áp\s*án[\:\s]*)", full_text, flags=re.IGNORECASE)
+        full_text = smart_join_lines(lines)
+
+        parts = re.split(r"((?:^|\n)\s*(?:H[^\s]*ng\s*d[^\s]*n\s*ch[^\s]*m|HD\s*ch[^\s]*m|Lời\s*giải|[^\s]*áp\s*án)[\:\s]*)", full_text, flags=re.IGNORECASE)
         if len(parts) >= 3:
             q_part = parts[0].strip()
             guide_part = "".join(parts[1:]).strip()
