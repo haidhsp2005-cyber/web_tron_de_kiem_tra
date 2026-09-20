@@ -362,26 +362,22 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
     p_p2_q1_a = doc.add_paragraph()
     p_p2_q1_a.paragraph_format.space_before = Pt(1)
     p_p2_q1_a.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q1_a, "a) Chi phí cố định khi chưa sản xuất sản phẩm nào (x = 0) là 500 nghìn đồng. ", bold=True, is_red=True)
-    add_run(p_p2_q1_a, "(Đúng)", bold=True, is_red=True)
+    add_run(p_p2_q1_a, "a) Chi phí cố định khi chưa sản xuất sản phẩm nào (x = 0) là 500 nghìn đồng.", bold=True, is_red=True)
 
     p_p2_q1_b = doc.add_paragraph()
     p_p2_q1_b.paragraph_format.space_before = Pt(1)
     p_p2_q1_b.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q1_b, "b) Chi phí biên tại mức sản lượng x = 10 là C'(10) = 100 nghìn đồng. ", bold=True, is_red=True)
-    add_run(p_p2_q1_b, "(Đúng)", bold=True, is_red=True)
+    add_run(p_p2_q1_b, "b) Chi phí biên tại mức sản lượng x = 10 là C'(10) = 100 nghìn đồng.", bold=True, is_red=True)
 
     p_p2_q1_c = doc.add_paragraph()
     p_p2_q1_c.paragraph_format.space_before = Pt(1)
     p_p2_q1_c.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q1_c, "c) Chi phí sản xuất trung bình cho mỗi sản phẩm luôn giảm khi số lượng sản phẩm tăng từ 0 đến 25. ")
-    add_run(p_p2_q1_c, "(Sai)", bold=False, is_red=False)
+    add_run(p_p2_q1_c, "c) Chi phí sản xuất trung bình cho mỗi sản phẩm luôn giảm khi số lượng sản phẩm tăng từ 0 đến 25.")
 
     p_p2_q1_d = doc.add_paragraph()
     p_p2_q1_d.paragraph_format.space_before = Pt(1)
     p_p2_q1_d.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q1_d, "d) Tổng chi phí sản xuất đạt giá trị nhỏ nhất khi mức sản lượng x = 20 sản phẩm. ")
-    add_run(p_p2_q1_d, "(Sai)", bold=False, is_red=False)
+    add_run(p_p2_q1_d, "d) Tổng chi phí sản xuất đạt giá trị nhỏ nhất khi mức sản lượng x = 20 sản phẩm.")
 
     # Q2: Tọa độ Oxyz tam giác và mặt phẳng
     p_p2_q2 = doc.add_paragraph()
@@ -395,26 +391,22 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
     p_p2_q2_a = doc.add_paragraph()
     p_p2_q2_a.paragraph_format.space_before = Pt(1)
     p_p2_q2_a.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q2_a, "a) Tọa độ trọng tâm G của tam giác ABC là G(1; 1; 2). ", bold=True, is_red=True)
-    add_run(p_p2_q2_a, "(Đúng)", bold=True, is_red=True)
+    add_run(p_p2_q2_a, "a) Tọa độ trọng tâm G của tam giác ABC là G(1; 1; 2).", bold=True, is_red=True)
 
     p_p2_q2_b = doc.add_paragraph()
     p_p2_q2_b.paragraph_format.space_before = Pt(1)
     p_p2_q2_b.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q2_b, "b) Mặt phẳng (P) có một vectơ pháp tuyến là n = (2; -1; 2). ", bold=True, is_red=True)
-    add_run(p_p2_q2_b, "(Đúng)", bold=True, is_red=True)
+    add_run(p_p2_q2_b, "b) Mặt phẳng (P) có một vectơ pháp tuyến là n = (2; -1; 2).", bold=True, is_red=True)
 
     p_p2_q2_c = doc.add_paragraph()
     p_p2_q2_c.paragraph_format.space_before = Pt(1)
     p_p2_q2_c.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q2_c, "c) Điểm A(1; 0; 2) nằm trên mặt phẳng (P). ")
-    add_run(p_p2_q2_c, "(Sai)", bold=False, is_red=False)
+    add_run(p_p2_q2_c, "c) Điểm A(1; 0; 2) nằm trên mặt phẳng (P).")
 
     p_p2_q2_d = doc.add_paragraph()
     p_p2_q2_d.paragraph_format.space_before = Pt(1)
     p_p2_q2_d.paragraph_format.space_after = Pt(1)
-    add_run(p_p2_q2_d, "d) Khoảng cách từ gốc tọa độ O đến mặt phẳng (P) bằng 1. ")
-    add_run(p_p2_q2_d, "(Sai)", bold=False, is_red=False)
+    add_run(p_p2_q2_d, "d) Khoảng cách từ gốc tọa độ O đến mặt phẳng (P) bằng 1.")
 
     # ==================== PHẦN III: TRẢ LỜI NGẮN (IN ĐẬM ĐÁP ÁN ĐỎ) ====================
     p_p3 = doc.add_paragraph()
@@ -778,24 +770,24 @@ def create_sample_pdf_from_docx(docx_path="samples/de_thi_mau_chuan.docx", pdf_p
     y += 13
     page1.insert_text((40, y), "Câu 1: Cho hàm tổng chi phí C(x) = x³ - 30x² + 400x + 500 (nghìn đồng) với 0 ≤ x ≤ 25:", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 10
-    page1.insert_text((55, y), "a) Chi phí cố định khi x = 0 là 500 nghìn đồng. (Đúng)", fontsize=8.5, fontname=fn_bold, color=c_red)
+    page1.insert_text((55, y), "a) Chi phí cố định khi x = 0 là 500 nghìn đồng.", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 10
-    page1.insert_text((55, y), "b) Chi phí biên tại mức sản lượng x = 10 là C'(10) = 100 nghìn đồng. (Đúng)", fontsize=8.5, fontname=fn_bold, color=c_red)
+    page1.insert_text((55, y), "b) Chi phí biên tại mức sản lượng x = 10 là C'(10) = 100 nghìn đồng.", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 10
-    page1.insert_text((55, y), "c) Chi phí trung bình luôn giảm khi sản lượng tăng từ 0 đến 25. (Sai)", fontsize=8.5, fontname=fn_reg, color=c_black)
+    page1.insert_text((55, y), "c) Chi phí trung bình luôn giảm khi sản lượng tăng từ 0 đến 25.", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 10
-    page1.insert_text((55, y), "d) Tổng chi phí sản xuất nhỏ nhất khi x = 20 sản phẩm. (Sai)", fontsize=8.5, fontname=fn_reg, color=c_black)
+    page1.insert_text((55, y), "d) Tổng chi phí sản xuất nhỏ nhất khi x = 20 sản phẩm.", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 13
 
     page1.insert_text((40, y), "Câu 2: Trong không gian Oxyz, cho A(1; 0; 2), B(-1; 1; 3), C(3; 2; 1) và (P): 2x - y + 2z - 5 = 0:", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 10
-    page1.insert_text((55, y), "a) Trọng tâm G của tam giác ABC là G(1; 1; 2). (Đúng)", fontsize=8.5, fontname=fn_bold, color=c_red)
+    page1.insert_text((55, y), "a) Trọng tâm G của tam giác ABC là G(1; 1; 2).", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 10
-    page1.insert_text((55, y), "b) Mặt phẳng (P) có vectơ pháp tuyến n = (2; -1; 2). (Đúng)", fontsize=8.5, fontname=fn_bold, color=c_red)
+    page1.insert_text((55, y), "b) Mặt phẳng (P) có vectơ pháp tuyến n = (2; -1; 2).", fontsize=8.5, fontname=fn_bold, color=c_red)
     y += 10
-    page1.insert_text((55, y), "c) Điểm A(1; 0; 2) nằm trên mặt phẳng (P). (Sai)", fontsize=8.5, fontname=fn_reg, color=c_black)
+    page1.insert_text((55, y), "c) Điểm A(1; 0; 2) nằm trên mặt phẳng (P).", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 10
-    page1.insert_text((55, y), "d) Khoảng cách từ O đến mặt phẳng (P) bằng 1. (Sai)", fontsize=8.5, fontname=fn_reg, color=c_black)
+    page1.insert_text((55, y), "d) Khoảng cách từ O đến mặt phẳng (P) bằng 1.", fontsize=8.5, fontname=fn_reg, color=c_black)
     y += 15
 
     # PHẦN III
