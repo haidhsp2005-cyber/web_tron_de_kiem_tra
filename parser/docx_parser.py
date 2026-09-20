@@ -237,6 +237,9 @@ class DocxParser:
             })
             return idx
 
+        seen_choice_keys = set()
+        active_choice = None
+
         # Otherwise look at succeeding paragraphs
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
@@ -252,20 +255,28 @@ class DocxParser:
             p_choices = self._extract_choices_from_p(next_p)
             if p_choices:
                 for k, c_info in p_choices.items():
+                    seen_choice_keys.add(k)
                     choices[k] = c_info.get("text", "")
                     choice_xmls[k] = c_info.get("xml_strings", [])
                     if c_info.get("is_red"):
                         correct_answer = k
                         found_red = True
+                active_choice = sorted(p_choices.keys())[-1]
                 idx += 1
             else:
-                # If it doesn't match choices and we haven't collected 4 choices, append to question
-                if not any(choices.values()):
+                if not seen_choice_keys:
                     clean_q_text += "<br>" + next_p["formatted_text"]
                     clean_q_xmls.extend(next_p["xml_strings"])
                     idx += 1
+                elif active_choice:
+                    choices[active_choice] = (choices[active_choice] + " " + next_p["formatted_text"]).strip()
+                    choice_xmls[active_choice].extend(next_p["xml_strings"])
+                    if next_p["has_red"]:
+                        correct_answer = active_choice
+                        found_red = True
+                    idx += 1
                 else:
-                    break
+                    idx += 1
 
         self.part1_questions.append({
             "id": len(self.part1_questions) + 1,
@@ -285,7 +296,7 @@ class DocxParser:
         text = p_data["raw_text"]
         fmt = p_data["formatted_text"]
         
-        matches = list(re.finditer(r"(?:^|\s{2,}|\t|\n)([A-D])[\.\:\)]\s*", text))
+        matches = list(re.finditer(r"(?:^|\s+)([A-D])[\.\:\)]\s*", text))
         if not matches:
             m_single = re.match(r"^\s*([A-D])[\.\:\)]\s*(.*)", text)
             if m_single:
@@ -352,7 +363,7 @@ class DocxParser:
             "c": {"text": "", "correct": False},
             "d": {"text": "", "correct": False}
         }
-        
+        last_key = None
         idx = start_idx + 1
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
@@ -368,6 +379,7 @@ class DocxParser:
             item_match = re.match(r"^\s*([a-d])[\)\.]\s*(.*)", next_text, re.IGNORECASE)
             if item_match:
                 key = item_match.group(1).lower()
+                last_key = key
                 content = re.sub(r"^\s*([a-d])[\)\.]\s*", "", next_p["formatted_text"]).strip()
                 
                 # Check True or False:
@@ -390,13 +402,27 @@ class DocxParser:
                 }
                 idx += 1
             else:
-                # Additional paragraph of the stem
-                if not any(v["text"] for v in items.values()):
+                if last_key is None:
+                    # Additional paragraph of the stem before any a), b), c), d)
                     clean_q_text += "<br>" + next_p["formatted_text"]
                     clean_q_xmls.extend(next_p["xml_strings"])
                     idx += 1
                 else:
-                    break
+                    # Multi-paragraph/continuation of the current item (e.g. item a)
+                    is_true_cont = next_p["has_red"]
+                    if "[ĐÚNG]" in next_text.upper() or "(ĐÚNG)" in next_text.upper():
+                        items[last_key]["correct"] = True
+                    elif "[SAI]" in next_text.upper() or "(SAI)" in next_text.upper():
+                        items[last_key]["correct"] = False
+                    elif is_true_cont:
+                        items[last_key]["correct"] = True
+
+                    clean_cont = re.sub(r"\[(Đúng|Sai)\]|\((Đúng|Sai)\)", "", next_p["formatted_text"], flags=re.IGNORECASE).strip()
+                    cont_xmls, _ = strip_elements_suffix(next_p["xml_strings"], r"(\[(Đúng|Sai)\]|\((Đúng|Sai)\))")
+                    if clean_cont:
+                        items[last_key]["text"] = (items[last_key]["text"] + " " + clean_cont).strip()
+                        items[last_key]["xml_strings"].extend(cont_xmls)
+                    idx += 1
 
         self.part2_questions.append({
             "id": len(self.part2_questions) + 1,

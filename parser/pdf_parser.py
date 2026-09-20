@@ -172,27 +172,41 @@ class PdfParser:
             })
             return idx
 
+        seen_choice_keys = set()
+        active_choice = None
+
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
             next_text = next_p["raw_text"].strip()
             
-            if QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or PART4_REGEX.search(next_text):
+            if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
+                PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
+                PART4_REGEX.search(next_text) or
+                re.search(r"(BẢNG\s+ĐÁP\s+ÁN|HƯỚNG\s+DẪN\s+CHẤM|\-\-\-+\s*HẾT)", next_text, re.IGNORECASE)):
                 break
                 
             p_choices = self._extract_choices_from_pdf_p(next_p)
             if p_choices:
                 for k, info in p_choices.items():
+                    seen_choice_keys.add(k)
                     choices[k] = info["text"]
                     if info["is_red"]:
                         correct_answer = k
                         found_red = True
+                active_choice = sorted(p_choices.keys())[-1]
                 idx += 1
             else:
-                if not any(choices.values()):
+                if not seen_choice_keys:
                     clean_q_text += "<br>" + next_text
                     idx += 1
+                elif active_choice:
+                    choices[active_choice] = (choices[active_choice] + " " + next_text).strip()
+                    if next_p["has_red"]:
+                        correct_answer = active_choice
+                        found_red = True
+                    idx += 1
                 else:
-                    break
+                    idx += 1
 
         self.part1_questions.append({
             "id": len(self.part1_questions) + 1,
@@ -208,7 +222,7 @@ class PdfParser:
     def _extract_choices_from_pdf_p(self, p_data) -> dict:
         res = {}
         text = p_data["raw_text"]
-        matches = list(re.finditer(r"(?:^|\s{2,}|\t|\n)([A-D])[\.\:\)]\s*", text))
+        matches = list(re.finditer(r"(?:^|\s+)([A-D])[\.\:\)]\s*", text))
         if not matches:
             m_single = re.match(r"^\s*([A-D])[\.\:\)]\s*(.*)", text)
             if m_single:
@@ -259,39 +273,54 @@ class PdfParser:
             "c": {"text": "", "correct": False},
             "d": {"text": "", "correct": False}
         }
-        
+        last_key = None
         idx = start_idx + 1
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
             next_text = next_p["raw_text"].strip()
             
-            if QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or PART4_REGEX.search(next_text):
+            if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
+                PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
+                PART4_REGEX.search(next_text) or
+                re.search(r"(BẢNG\s+ĐÁP\s+ÁN|HƯỚNG\s+DẪN\s+CHẤM|\-\-\-+\s*HẾT)", next_text, re.IGNORECASE)):
                 break
                 
             item_match = re.match(r"^\s*([a-d])[\)\.]\s*(.*)", next_text, re.IGNORECASE)
             if item_match:
                 key = item_match.group(1).lower()
+                last_key = key
                 content = re.sub(r"^\s*([a-d])[\)\.]\s*", "", next_text).strip()
                 
                 # True/False detection
                 is_true = next_p["has_red"]
-                if re.search(r"(\[|\()(Đ|·|D)úng(\]|\))", next_text, re.IGNORECASE):
+                if re.search(r"(\[|\()(Đ|·|D|đ)úng(\]|\))", next_text, re.IGNORECASE):
                     is_true = True
                 elif re.search(r"(\[|\()Sai(\]|\))", next_text, re.IGNORECASE):
                     is_true = False
                     
-                clean_content = re.sub(r"(\[|\()(Đ|·|D)úng(\]|\))|(\[|\()Sai(\]|\))", "", content, flags=re.IGNORECASE).strip()
+                clean_content = re.sub(r"(\[|\()(Đ|·|D|đ)úng(\]|\))|(\[|\()Sai(\]|\))", "", content, flags=re.IGNORECASE).strip()
                 items[key] = {
                     "text": clean_content,
                     "correct": is_true
                 }
                 idx += 1
             else:
-                if not any(v["text"] for v in items.values()):
+                if last_key is None:
                     clean_q_text += "<br>" + next_text
                     idx += 1
                 else:
-                    break
+                    is_true_cont = next_p["has_red"]
+                    if re.search(r"(\[|\()(Đ|·|D|đ)úng(\]|\))", next_text, re.IGNORECASE):
+                        items[last_key]["correct"] = True
+                    elif re.search(r"(\[|\()Sai(\]|\))", next_text, re.IGNORECASE):
+                        items[last_key]["correct"] = False
+                    elif is_true_cont:
+                        items[last_key]["correct"] = True
+                    
+                    clean_cont = re.sub(r"(\[|\()(Đ|·|D|đ)úng(\]|\))|(\[|\()Sai(\]|\))", "", next_text, flags=re.IGNORECASE).strip()
+                    if clean_cont:
+                        items[last_key]["text"] = (items[last_key]["text"] + " " + clean_cont).strip()
+                    idx += 1
 
         self.part2_questions.append({
             "id": len(self.part2_questions) + 1,
