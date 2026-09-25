@@ -192,6 +192,9 @@ def sanitize_latex_string(s: str) -> str:
     """Sanitize and repair common malformed LaTeX strings."""
     if not s:
         return ""
+    # 0. Unescape double backslashes before LaTeX keywords and braces
+    s = re.sub(r"\\\\([a-zA-Z{}])", r"\\\1", s)
+
     # 1. Clean nested \left\{ and \right. or \right) around \begin{cases}, \begin{aligned}, \begin{matrix}
     s = re.sub(r"\\left\\{\s*\\begin\{(?:cases|aligned|matrix)\}([\s\S]*?)\\end\{(?:cases|aligned|matrix)\}\s*(?:\\right[\.\)]?)?", r"\\begin{cases}\1\\end{cases}", s)
 
@@ -259,8 +262,16 @@ def extract_element_text_with_formatting(elem) -> tuple[str, bool]:
         math_text = extract_math_text(elem).strip()
         if math_text:
             math_text = sanitize_latex_string(math_text)
-            if re.match(r"^\-?\d+$", math_text):
+            # Pure number or percentage: return as plain text
+            if re.match(r"^\-?\d+([\.,]\d+)?\s*\%?$", math_text):
                 return math_text, is_red
+            # Quantity with Vietnamese unit (e.g. "500 nghìn đồng", "430 nghìn đồng", "10 kg"):
+            # If contains Vietnamese accents and no math operators, return as plain text
+            has_vn = bool(re.search(r'[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]', math_text))
+            has_math_ops = bool(re.search(r'[\=<>\\_\^\{\}\[\]\+\-\*\/]', math_text))
+            if has_vn and not has_math_ops:
+                return math_text, is_red
+
             if not math_text.startswith("$"):
                 return f"${math_text}$", is_red
             return math_text, is_red

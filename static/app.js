@@ -364,8 +364,8 @@ function renderExamEditor(data, filename) {
                 </div>
                 <div class="flex items-center space-x-3 pt-1">
                     <label class="text-xs font-bold text-slate-700">Đáp án:</label>
-                    <input type="text" value="${escapeHtml(q.answer || '')}" class="p3-ans-text w-36 px-3 py-1.5 text-xs font-bold border border-amber-300 rounded-lg bg-amber-50/50 text-amber-900 outline-none focus:ring-2 focus:ring-amber-500" data-idx="${idx}" placeholder="Nhập đáp số...">
-                    <span class="math-preview text-xs font-semibold text-amber-800" id="p3-prev-ans-${idx}">${formatMathPreview(q.answer || '')}</span>
+                    <input type="text" value="${escapeHtml((q.answer || '').replace(/^\$|\$$/g, ''))}" class="p3-ans-text w-36 px-3 py-1.5 text-xs font-bold border border-amber-300 rounded-lg bg-amber-50/50 text-amber-900 outline-none focus:ring-2 focus:ring-amber-500" data-idx="${idx}" placeholder="Nhập đáp số...">
+                    <span class="math-preview text-xs font-bold text-amber-800 ml-2" id="p3-prev-ans-${idx}">${formatMathPreview(q.answer || '')}</span>
                 </div>
             `;
             p3Container.appendChild(card);
@@ -787,6 +787,9 @@ function escapeHtml(text) {
 function formatMathPreview(html) {
     if (!html) return "";
     let s = String(html);
+
+    // 0. Unescape double backslashes before LaTeX keywords and braces
+    s = s.replace(/\\\\([a-zA-Z{}])/g, "\\$1");
 
     // 1. Clean nested \left\{ and \right. or \right) around \begin{cases}, \begin{aligned}, \begin{matrix}
     s = s.replace(/\\left\\{\s*\\begin\{(?:cases|aligned|matrix)\}([\s\S]*?)\\end\{(?:cases|aligned|matrix)\}\s*(?:\\right[\.\)]?)?/g, "\\begin{cases}$1\\end{cases}");
