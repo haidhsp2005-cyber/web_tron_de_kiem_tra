@@ -490,8 +490,8 @@ class DocxParser:
         answer = ""
         ans_pattern = (
             r"(?:"
-            r"(?:<br>|\n|^|\s{2,}|\b)(?:Đáp\s*án)\s*[:=]?\s*([^\n<]+)|"
-            r"(?:<br>|\n|^|\s{2,}|\b)(?:Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]\s*([^\n<]+)|"
+            r"(?:<br>|\n|^|\s+|\b|(?<=[^a-zà-ỹ]))\s*(?:Đáp\s*án)\s*[:=]?\s*([^\n<]+)|"
+            r"(?:<br>|\n|^|\s+|\b|(?<=[^a-zà-ỹ]))\s*(?:Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]\s*([^\n<]+)|"
             r"(?:<br>|\n|^)\s*(?:Kết\s*quả|KQ)\s*[:=]\s*([^\n<?]+)"
             r")"
         )
@@ -515,7 +515,7 @@ class DocxParser:
                         break
 
         # Strip answer from clean_q_xmls so student exam NEVER contains the answer
-        safe_suffix_pattern = r"((?:^|\n|\s{2,}|\b)(?:Đáp\s*án\s*[:=]?|(?:Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]))"
+        safe_suffix_pattern = r"(?:(?:^|\n|\s+|\b|(?<=[^a-zà-ỹ]))\s*(?:Đáp\s*án\s*[:=]?|(?:Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]))"
         clean_q_xmls, removed_ans = strip_elements_suffix(clean_q_xmls, safe_suffix_pattern)
         if removed_ans and not answer:
             m_a = re.search(r"(?:Đáp\s*án|Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]?\s*([^\n<]+)", removed_ans, re.IGNORECASE)
@@ -526,6 +526,8 @@ class DocxParser:
         clean_q = re.sub(r"^\s*(Câu|Bài)\s+\d+[\.\:\-\s]+", "", clean_q).strip()
         clean_q = sanitize_latex_string(clean_q)
         answer = sanitize_latex_string(answer)
+        if re.search(r"(\\[a-zA-Z]+|[\^_])", answer) and not (answer.startswith("$") and answer.endswith("$")):
+            answer = f"${answer.strip()}$"
 
         self.part3_questions.append({
             "id": len(self.part3_questions) + 1,

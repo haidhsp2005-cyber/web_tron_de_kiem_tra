@@ -532,11 +532,12 @@ class DocxExporter:
                     p1.paragraph_format.space_before = Pt(3)
                     p1.paragraph_format.space_after = Pt(3)
                     ans_val = str(q.get("answer", ""))
-                    r1 = p1.add_run(ans_val)
-                    r1.bold = True
-                    r1.font.name = "Times New Roman"
-                    r1.font.size = Pt(11.5)
-                    r1.font.color.rgb = RED_COLOR
+                    self._insert_formatted_text(p1, ans_val, is_red=True)
+                    for r in p1.runs:
+                        r.bold = True
+                        r.font.name = "Times New Roman"
+                        r.font.size = Pt(11.5)
+                        r.font.color.rgb = RED_COLOR
 
         # ----------------- PHẦN IV -----------------
         if variant.get("part4"):
@@ -654,7 +655,19 @@ class DocxExporter:
                         )
                         paragraph._p.append(parse_xml(xml_str))
                         continue
-                math_clean = math_inner.replace("\\frac", "").replace("\\sqrt", "√").replace("\\int", "∫").replace("\\vec", "").replace("{", "").replace("}", "")
+                math_clean = math_inner
+                math_clean = math_clean.replace("\\neq", "≠").replace("\\ne", "≠")
+                math_clean = math_clean.replace("\\leq", "≤").replace("\\le", "≤")
+                math_clean = math_clean.replace("\\geq", "≥").replace("\\ge", "≥")
+                math_clean = math_clean.replace("\\pm", "±").replace("\\mp", "∓")
+                math_clean = math_clean.replace("\\approx", "≈").replace("\\times", "×").replace("\\cdot", "·")
+                math_clean = math_clean.replace("\\infty", "∞").replace("\\in", "∈").replace("\\notin", "∉")
+                math_clean = math_clean.replace("\\subset", "⊂").replace("\\cup", "∪").replace("\\cap", "∩").replace("\\emptyset", "∅")
+                math_clean = math_clean.replace("\\forall", "∀").replace("\\exists", "∃")
+                math_clean = math_clean.replace("\\alpha", "α").replace("\\beta", "β").replace("\\gamma", "γ").replace("\\pi", "π").replace("\\Delta", "Δ").replace("\\theta", "θ")
+                math_clean = math_clean.replace("\\degree", "°").replace("^\\circ", "°")
+                math_clean = math_clean.replace("\\frac", "").replace("\\sqrt", "√").replace("\\int", "∫").replace("\\vec", "")
+                math_clean = math_clean.replace("\\left", "").replace("\\right", "").replace("{", "").replace("}", "")
                 r = paragraph.add_run(math_clean)
                 r.italic = True
                 if is_red:
@@ -817,7 +830,9 @@ class DocxExporter:
                 
                 for c_idx, c in enumerate(codes, start=1):
                     ans_val = str(r_data.get(c, ""))
-                    row_cells[c_idx].paragraphs[0].add_run(ans_val)
+                    self._insert_formatted_text(row_cells[c_idx].paragraphs[0], ans_val)
+                    for r in row_cells[c_idx].paragraphs[0].runs:
+                        r.bold = True
                     format_cell(row_cells[c_idx], bg_hex=bg, bold=True)
 
         doc.save(file_path)

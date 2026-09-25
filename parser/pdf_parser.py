@@ -58,6 +58,8 @@ def smart_join_lines(lines: list[str]) -> str:
             
     return result
 
+from .formula_helper import sanitize_latex_string
+
 def clean_math_text(text: str) -> str:
     r"""
     Normalizes and repairs math expressions across Grade 6-12 curriculum:
@@ -85,31 +87,47 @@ def clean_math_text(text: str) -> str:
     s = re.sub(r"(?<!\$)\\vec\s*\{([A-Za-z0-9]{1,4})\}(?!\$)", r"$\\vec{\1}$", s)
 
     # 3. Systems of equations (Unicode brace glyphs: ⎧ ⎨ ⎩ ⎪)
-    pattern_unicode = re.compile(r"[⎧\u23a7]\s*([^\n\r<]+)(?:<br\s*/?>|[\n\r]+)(?:[⎨⎪\u23a8\u23aa]\s*[^\n\r<]+(?:<br\s*/?>|[\n\r]+))*[⎩\u23a9]\s*([^\n\r<]+)")
-    s = pattern_unicode.sub(r"$\\begin{cases} \1 \\\\ \2 \\end{cases}$", s)
+    def repl_unicode_cases(m):
+        block = m.group(0)
+        raw_lines = re.split(r"<br\s*/?>|[\n\r]+", block)
+        clean_lines = []
+        for l in raw_lines:
+            l_clean = re.sub(r"[⎧⎨⎩⎪\u23a7\u23a8\u23a9\u23aa\u23ab\u23ac\u23ad]", "", l).strip()
+            if l_clean:
+                clean_lines.append(l_clean)
+        if clean_lines:
+            return f"$\\begin{{cases}} {' \\\\ '.join(clean_lines)} \\end{{cases}}$"
+        return block
+
+    pattern_unicode = re.compile(r"[⎧\u23a7][^\n\r<]*(?:(?:<br\s*/?>|[\n\r]+)[^⎩\u23a9\n\r<]*)*[⎩\u23a9][^\n\r<]*")
+    s = pattern_unicode.sub(repl_unicode_cases, s)
 
     # 4. Systems of equations (Text braces: "{ eq1 \n eq2" or "{ eq1 <br> eq2")
-    pattern_brace = re.compile(r"\{\s*([^\n\r<]+)(?:<br\s*/?>|[\n\r]+)\s*([^\n\r<]+)")
+    pattern_brace = re.compile(r"\{\s*([^\n\r<]+)(?:<br\s*/?>|[\n\r]+)\s*([^\n\r<]+)(?:(?:<br\s*/?>|[\n\r]+)\s*([^\n\r<]+))?")
     def repl_brace(m):
         eq1 = m.group(1).strip()
         eq2 = m.group(2).strip()
+        eq3 = (m.group(3) or "").strip()
+        eqs = [eq1, eq2]
+        if eq3 and any(op in eq3 for op in ["=", "<", ">", "≤", "≥", "≠"]):
+            eqs.append(eq3)
         if any(op in eq1 for op in ["=", "<", ">", "≤", "≥", "≠"]) and any(op in eq2 for op in ["=", "<", ">", "≤", "≥", "≠"]):
-            return f"$\\begin{{cases}} {eq1} \\\\ {eq2} \\end{{cases}}$"
+            return f"$\\begin{{cases}} {' \\\\ '.join(eqs)} \\end{{cases}}$"
         return m.group(0)
     s = pattern_brace.sub(repl_brace, s)
 
-    # 5. Malformed LaTeX environments: ${\begin{aligned} ... \end{aligned}$
-    s = re.sub(r"\$\s*\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?\s*\$", r"$\\begin{cases}\1\\end{cases}$", s)
-    s = re.sub(r"\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?", r"\\begin{cases}\1\\end{cases}", s)
-    s = re.sub(r"\\left\\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\\right\.?", r"\\begin{cases}\1\\end{cases}", s)
+    # 5. Convert \left\{\begin{matrix} or \begin{matrix} or \begin{aligned} to \begin{cases}
+    s = re.sub(r"\\left\\{\s*\\begin\{(?:cases|aligned|matrix)\}([\s\S]*?)\\end\{(?:cases|aligned|matrix)\}\s*(?:\\right[\.\)]?)?", r"\\begin{cases}\1\\end{cases}", s)
+    s = re.sub(r"\{\s*\\begin\{(?:cases|aligned|matrix)\}([\s\S]*?)\\end\{(?:cases|aligned|matrix)\}\s*\}?", r"\\begin{cases}\1\\end{cases}", s)
     s = re.sub(r"\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}", r"\\begin{cases}\1\\end{cases}", s)
-    s = re.sub(r"\$\s*\{\s*(\\begin\{cases\}[\s\S]*?\\end\{cases\})\s*\}?\s*\$", r"$\1$", s)
-    s = re.sub(r"(?<!\$)\\begin\{cases\}([\s\S]*?)\\end\{cases\}(?!\$)", r"$\\begin{cases}\1\\end{cases}$", s)
 
     # 6. Standalone LaTeX radicals/fractions/integrals not wrapped in $:
     s = re.sub(r"(?<!\$)\\frac\{([^{}]+)\}\{([^{}]+)\}(?!\$)", r"$\\frac{\1}{\2}$", s)
     s = re.sub(r"(?<!\$)\\sqrt\{([^{}]+)\}(?!\$)", r"$\\sqrt{\1}$", s)
     s = re.sub(r"(?<!\$)\\sqrt\[([^\[\]]+)\]\{([^{}]+)\}(?!\$)", r"$\\sqrt[\1]{\2}$", s)
+
+    # 7. Sanitize latex string
+    s = sanitize_latex_string(s)
 
     return s
 
@@ -515,6 +533,8 @@ class PdfParser:
         clean_q = re.sub(r"^\s*(C[^\s]*u|B[^\s]*i)\s+\d+[\.\:\-\s]+", "", clean_q).strip()
         clean_q = clean_math_text(clean_q)
         answer = clean_math_text(answer)
+        if re.search(r"(\\[a-zA-Z]+|[\^_])", answer) and not (answer.startswith("$") and answer.endswith("$")):
+            answer = f"${answer.strip()}$"
 
         self.part3_questions.append({
             "id": len(self.part3_questions) + 1,

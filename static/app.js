@@ -365,6 +365,7 @@ function renderExamEditor(data, filename) {
                 <div class="flex items-center space-x-3 pt-1">
                     <label class="text-xs font-bold text-slate-700">Đáp án:</label>
                     <input type="text" value="${escapeHtml(q.answer || '')}" class="p3-ans-text w-36 px-3 py-1.5 text-xs font-bold border border-amber-300 rounded-lg bg-amber-50/50 text-amber-900 outline-none focus:ring-2 focus:ring-amber-500" data-idx="${idx}" placeholder="Nhập đáp số...">
+                    <span class="math-preview text-xs font-semibold text-amber-800" id="p3-prev-ans-${idx}">${formatMathPreview(q.answer || '')}</span>
                 </div>
             `;
             p3Container.appendChild(card);
@@ -479,6 +480,11 @@ function attachEditorListeners() {
         input.addEventListener("input", (e) => {
             const idx = parseInt(e.target.dataset.idx);
             currentExamData.part3[idx].answer = e.target.value;
+            const prev = document.getElementById(`p3-prev-ans-${idx}`);
+            if (prev) {
+                prev.innerHTML = formatMathPreview(e.target.value);
+                renderMathSafe(prev);
+            }
         });
     });
 
@@ -782,16 +788,16 @@ function formatMathPreview(html) {
     if (!html) return "";
     let s = String(html);
 
-    // 1. Clean nested \left\{ and \right. around \begin{cases} or \begin{aligned}
-    s = s.replace(/\\left\\{\s*\\begin\{(cases|aligned)\}/g, "\\begin{$1}");
-    s = s.replace(/\\end\{(cases|aligned)\}\s*\\right\.?/g, "\\end{$1}");
+    // 1. Clean nested \left\{ and \right. or \right) around \begin{cases}, \begin{aligned}, \begin{matrix}
+    s = s.replace(/\\left\\{\s*\\begin\{(?:cases|aligned|matrix)\}([\s\S]*?)\\end\{(?:cases|aligned|matrix)\}\s*(?:\\right[\.\)]?)?/g, "\\begin{cases}$1\\end{cases}");
+    s = s.replace(/(?:\\left\\{|\{)\s*\\begin\{(?:matrix|aligned)\}([\s\S]*?)\\end\{(?:matrix|aligned)\}\s*(?:\\right[\.\)]?|\})?/g, "\\begin{cases}$1\\end{cases}");
 
-    // 2. Convert \begin{aligned} to \begin{cases}
+    // 2. Convert standalone \begin{aligned} to \begin{cases}
     s = s.replace(/\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}/g, "\\begin{cases}$1\\end{cases}");
 
     // 3. Clean and collapse any malformed wraps like ${\$\begin{cases} ... \end{cases}$$, ${\begin{cases} ... \end{cases}$, etc.
     s = s.replace(
-        /(?:\\left\\{|\{)?\s*\\?\$*\s*(?:\\left\\{|\{)?\s*\\?\$*\s*\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*(?:\\right\.?|\})?\s*\\?\$*\s*(?:\\right\.?|\})?\s*\\?\$*/g,
+        /(?:\\left\\{|\{)?\s*\\?\$*\s*(?:\\left\\{|\{)?\s*\\?\$*\s*\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*(?:\\right[\.\)]?|\})?\s*\\?\$*\s*(?:\\right[\.\)]?|\})?\s*\\?\$*/g,
         "$\\begin{cases}$1\\end{cases}$"
     );
 
@@ -808,7 +814,12 @@ function formatMathPreview(html) {
     s = s.replace(/(?<!\$)\\sqrt\{([^{}]+)\}(?!\$)/g, "$\\sqrt{$1}$");
     s = s.replace(/(?<!\$)\\sqrt\[([^\[\]]+)\]\{([^{}]+)\}(?!\$)/g, "$\\sqrt[$1]{$2}$");
 
-    // 7. Clean up soft hyphens and unicode artifacts from PDF
+    // 7. If text contains naked math commands (e.g. "m \neq 6", "x \ge 2", "\int_0^1 x dx") and no $, wrap it in $
+    if (!s.includes("$") && /\\[a-zA-Z]+/.test(s)) {
+        s = "$" + s.trim() + "$";
+    }
+
+    // 8. Clean up soft hyphens and unicode artifacts from PDF
     s = s.replace(/\u00ad/g, "-");
     s = s.replace(/\u2212/g, "-");
     s = s.replace(/\u037e/g, ";");
