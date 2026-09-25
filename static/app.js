@@ -782,30 +782,33 @@ function formatMathPreview(html) {
     if (!html) return "";
     let s = String(html);
 
-    // 1. Repair malformed / broken system of equations LaTeX (from Word/online banks):
-    // E.g.: ${\begin{aligned} ... \end{aligned}$ -> $\begin{cases} ... \end{cases}$
-    s = s.replace(/\$\s*\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?\s*\$/g, "$\\begin{cases}$1\\end{cases}$");
-    s = s.replace(/\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?/g, "\\begin{cases}$1\\end{cases}");
-    s = s.replace(/\\left\\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\\right\.?/g, "\\begin{cases}$1\\end{cases}");
+    // 1. Clean nested \left\{ and \right. around \begin{cases} or \begin{aligned}
+    s = s.replace(/\\left\\{\s*\\begin\{(cases|aligned)\}/g, "\\begin{$1}");
+    s = s.replace(/\\end\{(cases|aligned)\}\s*\\right\.?/g, "\\end{$1}");
+
+    // 2. Convert \begin{aligned} to \begin{cases}
     s = s.replace(/\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}/g, "\\begin{cases}$1\\end{cases}");
 
-    // 2. Repair ${\begin{cases} ... \end{cases}$ or redundant outer braces
-    s = s.replace(/\$\s*\{\s*\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*\}?\s*\$/g, "$\\begin{cases}$1\\end{cases}$");
-    s = s.replace(/\{\s*\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*\}?/g, "\\begin{cases}$1\\end{cases}");
+    // 3. Clean and collapse any malformed wraps like ${\$\begin{cases} ... \end{cases}$$, ${\begin{cases} ... \end{cases}$, etc.
+    s = s.replace(
+        /(?:\\left\\{|\{)?\s*\\?\$*\s*(?:\\left\\{|\{)?\s*\\?\$*\s*\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*(?:\\right\.?|\})?\s*\\?\$*\s*(?:\\right\.?|\})?\s*\\?\$*/g,
+        "$\\begin{cases}$1\\end{cases}$"
+    );
 
-    // 3. Ensure any standalone \begin{cases} not wrapped in $ is wrapped
-    s = s.replace(/(?<!\$)\\begin\{cases\}([\s\S]*?)\\end\{cases\}(?!\$)/g, "$\\begin{cases}$1\\end{cases}$");
+    // 4. Ensure space around $\begin{cases} if abutting regular letters
+    s = s.replace(/([^\s\$])(\$\\begin\{cases\})/g, "$1 $2");
+    s = s.replace(/(\\end\{cases\}\$)([^\s\$\.\,\;\:\?\!])/g, "$1 $2");
 
-    // 4. Convert unicode vector arrows (e.g. u\u20d7, a\u20d7, u⃗, a⃗, AB⃗) into KaTeX $\vec{...}$
+    // 5. Convert unicode vector arrows (e.g. u\u20d7, a\u20d7, u⃗, a⃗, AB⃗) into KaTeX $\vec{...}$
     s = s.replace(/([A-Za-z]{1,3})[\u20D7\u2192\u20D6⃗]/g, "$\\vec{$1}$");
     s = s.replace(/(?<!\$)\\vec\s*\{([A-Za-z0-9]{1,4})\}(?!\$)/g, "$\\vec{$1}$");
 
-    // 5. Ensure common standalone LaTeX math commands are wrapped in $ if naked:
+    // 6. Ensure common standalone LaTeX math commands are wrapped in $ if naked:
     s = s.replace(/(?<!\$)\\frac\{([^{}]+)\}\{([^{}]+)\}(?!\$)/g, "$\\frac{$1}{$2}$");
     s = s.replace(/(?<!\$)\\sqrt\{([^{}]+)\}(?!\$)/g, "$\\sqrt{$1}$");
     s = s.replace(/(?<!\$)\\sqrt\[([^\[\]]+)\]\{([^{}]+)\}(?!\$)/g, "$\\sqrt[$1]{$2}$");
 
-    // 6. Clean up soft hyphens and unicode artifacts from PDF
+    // 7. Clean up soft hyphens and unicode artifacts from PDF
     s = s.replace(/\u00ad/g, "-");
     s = s.replace(/\u2212/g, "-");
     s = s.replace(/\u037e/g, ";");

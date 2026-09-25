@@ -192,13 +192,24 @@ def sanitize_latex_string(s: str) -> str:
     """Sanitize and repair common malformed LaTeX strings."""
     if not s:
         return ""
-    # Repair ${\begin{aligned} ... \end{aligned}$ -> $\begin{cases} ... \end{cases}$
-    s = re.sub(r"\$\s*\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?\s*\$", r"$\\begin{cases}\1\\end{cases}$", s)
-    s = re.sub(r"\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?", r"\\begin{cases}\1\\end{cases}", s)
-    s = re.sub(r"\\left\\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\\right\.?", r"\\begin{cases}\1\\end{cases}", s)
+    # 1. Clean nested \left\{ and \right. around \begin{cases} or \begin{aligned}
+    s = re.sub(r"\\left\\{\s*\\begin\{(cases|aligned)\}", r"\\begin{\1}", s)
+    s = re.sub(r"\\end\{(cases|aligned)\}\s*\\right\.?", r"\\end{\1}", s)
+
+    # 2. Convert \begin{aligned} to \begin{cases}
     s = re.sub(r"\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}", r"\\begin{cases}\1\\end{cases}", s)
-    s = re.sub(r"\$\s*\{\s*(\\begin\{cases\}[\s\S]*?\\end\{cases\})\s*\}?\s*\$", r"$\1$", s)
-    s = re.sub(r"(?<!\$)\\begin\{cases\}([\s\S]*?)\\end\{cases\}(?!\$)", r"$\\begin{cases}\1\\end{cases}$", s)
+
+    # 3. Clean malformed wraps like ${\$\begin{cases} ... \end{cases}$$ or ${\begin{cases} ... \end{cases}$
+    s = re.sub(
+        r"(?:\\left\\{|\{)?\s*\\?\$*\s*(?:\\left\\{|\{)?\s*\\?\$*\s*\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*(?:\\right\.?|\})?\s*\\?\$*\s*(?:\\right\.?|\})?\s*\\?\$*",
+        r"$\\begin{cases}\1\\end{cases}$",
+        s
+    )
+
+    # 4. Ensure space around $\begin{cases} if abutting regular letters
+    s = re.sub(r"([^\s\$])(\$\\begin\{cases\})", r"\1 \2", s)
+    s = re.sub(r"(\\end\{cases\}\$)([^\s\$\.\,\;\:\?\!])", r"\1 \2", s)
+
     return s
 
 def extract_element_text_with_formatting(elem) -> tuple[str, bool]:
@@ -410,27 +421,43 @@ def omml_to_latex(elem) -> str:
         
         # System of equations: left curly brace '{' with no right brace
         if beg_chr == "{" and (not end_chr or end_chr in ["", " ", "."]):
+            rows = []
             for e_item in e_list:
-                eq_arr = e_item.find(qn("m:eqArr"))
-                if eq_arr is not None:
-                    rows = [omml_to_latex(r) for r in eq_arr.findall(qn("m:e"))]
-                    arr_inner = " \\\\ ".join(rows)
-                    return f"\\begin{{cases}} {arr_inner} \\end{{cases}}"
-            rows = [omml_to_latex(e_item) for e_item in e_list]
-            arr_inner = " \\\\ ".join(rows)
+                eq_arrs = list(e_item.iter(qn("m:eqArr")))
+                if eq_arrs:
+                    for ea in eq_arrs:
+                        for r in ea.findall(qn("m:e")):
+                            rows.append(omml_to_latex(r))
+                else:
+                    rows.append(omml_to_latex(e_item))
+            clean_rows = []
+            for r in rows:
+                r_clean = re.sub(r"\\(begin|end)\{(cases|aligned)\}", "", r).strip()
+                if r_clean:
+                    clean_rows.append(r_clean)
+            arr_inner = " \\\\ ".join(clean_rows)
             return f"\\begin{{cases}} {arr_inner} \\end{{cases}}"
         elif beg_chr == "[" and (not end_chr or end_chr in ["", " ", "."]):
+            rows = []
             for e_item in e_list:
-                eq_arr = e_item.find(qn("m:eqArr"))
-                if eq_arr is not None:
-                    rows = [omml_to_latex(r) for r in eq_arr.findall(qn("m:e"))]
-                    arr_inner = " \\\\ ".join(rows)
-                    return f"\\left[ \\begin{{aligned}} {arr_inner} \\end{{aligned}} \\right."
-            rows = [omml_to_latex(e_item) for e_item in e_list]
-            arr_inner = " \\\\ ".join(rows)
+                eq_arrs = list(e_item.iter(qn("m:eqArr")))
+                if eq_arrs:
+                    for ea in eq_arrs:
+                        for r in ea.findall(qn("m:e")):
+                            rows.append(omml_to_latex(r))
+                else:
+                    rows.append(omml_to_latex(e_item))
+            clean_rows = []
+            for r in rows:
+                r_clean = re.sub(r"\\(begin|end)\{(cases|aligned)\}", "", r).strip()
+                if r_clean:
+                    clean_rows.append(r_clean)
+            arr_inner = " \\\\ ".join(clean_rows)
             return f"\\left[ \\begin{{aligned}} {arr_inner} \\end{{aligned}} \\right."
 
         inner = ", ".join(omml_to_latex(e_item) for e_item in e_list)
+        if "\\begin{cases}" in inner:
+            return re.sub(r"\\left\\{\s*(\\begin\{cases\}[\s\S]*?\\end\{cases\})\s*\\right\.?", r"\1", inner)
         left_b = "\\{" if beg_chr == "{" else ("." if not beg_chr else beg_chr)
         right_b = "\\}" if end_chr == "}" else ("." if not end_chr else end_chr)
         return f"\\left{left_b}{inner}\\right{right_b}"
