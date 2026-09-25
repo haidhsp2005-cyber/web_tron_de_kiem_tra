@@ -188,6 +188,19 @@ def set_red_on_element(elem):
     except Exception:
         pass
 
+def sanitize_latex_string(s: str) -> str:
+    """Sanitize and repair common malformed LaTeX strings."""
+    if not s:
+        return ""
+    # Repair ${\begin{aligned} ... \end{aligned}$ -> $\begin{cases} ... \end{cases}$
+    s = re.sub(r"\$\s*\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?\s*\$", r"$\\begin{cases}\1\\end{cases}$", s)
+    s = re.sub(r"\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?", r"\\begin{cases}\1\\end{cases}", s)
+    s = re.sub(r"\\left\\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\\right\.?", r"\\begin{cases}\1\\end{cases}", s)
+    s = re.sub(r"\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}", r"\\begin{cases}\1\\end{cases}", s)
+    s = re.sub(r"\$\s*\{\s*(\\begin\{cases\}[\s\S]*?\\end\{cases\})\s*\}?\s*\$", r"$\1$", s)
+    s = re.sub(r"(?<!\$)\\begin\{cases\}([\s\S]*?)\\end\{cases\}(?!\$)", r"$\\begin{cases}\1\\end{cases}$", s)
+    return s
+
 def extract_element_text_with_formatting(elem) -> tuple[str, bool]:
     """
     Extract text from a <w:r> or <m:oMath> or <m:oMathPara> element.
@@ -232,6 +245,7 @@ def extract_element_text_with_formatting(elem) -> tuple[str, bool]:
         is_red = is_math_element_red(elem)
         math_text = extract_math_text(elem).strip()
         if math_text:
+            math_text = sanitize_latex_string(math_text)
             if re.match(r"^\-?\d+$", math_text):
                 return math_text, is_red
             if not math_text.startswith("$"):
@@ -393,8 +407,30 @@ def omml_to_latex(elem) -> str:
                 end_chr = e_elem.attrib.get(qn("m:val"), ")")
         
         e_list = elem.findall(qn("m:e"))
-        inner = ", ".join(omml_to_latex(e_item) for e_item in e_list)
         
+        # System of equations: left curly brace '{' with no right brace
+        if beg_chr == "{" and (not end_chr or end_chr in ["", " ", "."]):
+            for e_item in e_list:
+                eq_arr = e_item.find(qn("m:eqArr"))
+                if eq_arr is not None:
+                    rows = [omml_to_latex(r) for r in eq_arr.findall(qn("m:e"))]
+                    arr_inner = " \\\\ ".join(rows)
+                    return f"\\begin{{cases}} {arr_inner} \\end{{cases}}"
+            rows = [omml_to_latex(e_item) for e_item in e_list]
+            arr_inner = " \\\\ ".join(rows)
+            return f"\\begin{{cases}} {arr_inner} \\end{{cases}}"
+        elif beg_chr == "[" and (not end_chr or end_chr in ["", " ", "."]):
+            for e_item in e_list:
+                eq_arr = e_item.find(qn("m:eqArr"))
+                if eq_arr is not None:
+                    rows = [omml_to_latex(r) for r in eq_arr.findall(qn("m:e"))]
+                    arr_inner = " \\\\ ".join(rows)
+                    return f"\\left[ \\begin{{aligned}} {arr_inner} \\end{{aligned}} \\right."
+            rows = [omml_to_latex(e_item) for e_item in e_list]
+            arr_inner = " \\\\ ".join(rows)
+            return f"\\left[ \\begin{{aligned}} {arr_inner} \\end{{aligned}} \\right."
+
+        inner = ", ".join(omml_to_latex(e_item) for e_item in e_list)
         left_b = "\\{" if beg_chr == "{" else ("." if not beg_chr else beg_chr)
         right_b = "\\}" if end_chr == "}" else ("." if not end_chr else end_chr)
         return f"\\left{left_b}{inner}\\right{right_b}"
@@ -422,7 +458,7 @@ def omml_to_latex(elem) -> str:
     elif tag == "eqArr": # Equation array
         rows = [omml_to_latex(e_item) for e_item in elem.findall(qn("m:e"))]
         arr_inner = " \\\\ ".join(rows)
-        return f"\\begin{{aligned}} {arr_inner} \\end{{aligned}}"
+        return f"\\begin{{cases}} {arr_inner} \\end{{cases}}"
 
     else:
         parts = [omml_to_latex(child) for child in elem]

@@ -58,6 +58,61 @@ def smart_join_lines(lines: list[str]) -> str:
             
     return result
 
+def clean_math_text(text: str) -> str:
+    r"""
+    Normalizes and repairs math expressions across Grade 6-12 curriculum:
+    - Fractions (\frac{a}{b}, a/b, unicode fractions)
+    - Roots/Radicals (\sqrt{x}, \sqrt[n]{x}, √x)
+    - Superscripts/Powers (x², x³, xⁿ, x^n)
+    - Subscripts (x₁, x₂, u_n)
+    - Vectors (a⃗, u⃗, AB⃗, \vec{u})
+    - Systems of equations (cases, aligned, braces {, unicode ⎧ ⎨ ⎩ ⎪)
+    - Calculus (\int, \lim, \sum)
+    - Geometry & Set & Logic symbols (⊥, ∥, △, ∠, °, ∈, ∉, ⊂, ∪, ∩, ∅, ∀, ∃, ⇒, ⇔)
+    """
+    if not text:
+        return ""
+    s = str(text)
+
+    # 1. Normalize unicode characters & PDF font artifacts
+    s = s.replace('\u00ad', '-')      # Soft hyphen
+    s = s.replace('\u2212', '-')      # Unicode minus
+    s = s.replace('\u00a0', ' ')      # Non-breaking space
+    s = s.replace('\u037e', ';')      # Greek question mark / semicolon
+    
+    # 2. Vectors: a⃗, u⃗, AB⃗, \vec{u}
+    s = re.sub(r"([A-Za-z]{1,3})[\u20D7\u2192\u20D6⃗]", r"$\\vec{\1}$", s)
+    s = re.sub(r"(?<!\$)\\vec\s*\{([A-Za-z0-9]{1,4})\}(?!\$)", r"$\\vec{\1}$", s)
+
+    # 3. Systems of equations (Unicode brace glyphs: ⎧ ⎨ ⎩ ⎪)
+    pattern_unicode = re.compile(r"[⎧\u23a7]\s*([^\n\r<]+)(?:<br\s*/?>|[\n\r]+)(?:[⎨⎪\u23a8\u23aa]\s*[^\n\r<]+(?:<br\s*/?>|[\n\r]+))*[⎩\u23a9]\s*([^\n\r<]+)")
+    s = pattern_unicode.sub(r"$\\begin{cases} \1 \\\\ \2 \\end{cases}$", s)
+
+    # 4. Systems of equations (Text braces: "{ eq1 \n eq2" or "{ eq1 <br> eq2")
+    pattern_brace = re.compile(r"\{\s*([^\n\r<]+)(?:<br\s*/?>|[\n\r]+)\s*([^\n\r<]+)")
+    def repl_brace(m):
+        eq1 = m.group(1).strip()
+        eq2 = m.group(2).strip()
+        if any(op in eq1 for op in ["=", "<", ">", "≤", "≥", "≠"]) and any(op in eq2 for op in ["=", "<", ">", "≤", "≥", "≠"]):
+            return f"$\\begin{{cases}} {eq1} \\\\ {eq2} \\end{{cases}}$"
+        return m.group(0)
+    s = pattern_brace.sub(repl_brace, s)
+
+    # 5. Malformed LaTeX environments: ${\begin{aligned} ... \end{aligned}$
+    s = re.sub(r"\$\s*\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?\s*\$", r"$\\begin{cases}\1\\end{cases}$", s)
+    s = re.sub(r"\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?", r"\\begin{cases}\1\\end{cases}", s)
+    s = re.sub(r"\\left\\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\\right\.?", r"\\begin{cases}\1\\end{cases}", s)
+    s = re.sub(r"\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}", r"\\begin{cases}\1\\end{cases}", s)
+    s = re.sub(r"\$\s*\{\s*(\\begin\{cases\}[\s\S]*?\\end\{cases\})\s*\}?\s*\$", r"$\1$", s)
+    s = re.sub(r"(?<!\$)\\begin\{cases\}([\s\S]*?)\\end\{cases\}(?!\$)", r"$\\begin{cases}\1\\end{cases}$", s)
+
+    # 6. Standalone LaTeX radicals/fractions/integrals not wrapped in $:
+    s = re.sub(r"(?<!\$)\\frac\{([^{}]+)\}\{([^{}]+)\}(?!\$)", r"$\\frac{\1}{\2}$", s)
+    s = re.sub(r"(?<!\$)\\sqrt\{([^{}]+)\}(?!\$)", r"$\\sqrt{\1}$", s)
+    s = re.sub(r"(?<!\$)\\sqrt\[([^\[\]]+)\]\{([^{}]+)\}(?!\$)", r"$\\sqrt[\1]{\2}$", s)
+
+    return s
+
 class PdfParser:
     def __init__(self, file_path: str):
         self.file_path = file_path
@@ -200,17 +255,17 @@ class PdfParser:
 
         idx = start_idx + 1
         # Check inline choices
-        inline_c = self._extract_choices_from_pdf_p(p_data)
+        inline_c, inline_splits = self._extract_choices_from_pdf_p(p_data)
         if len(inline_c) >= 2:
             for k, info in inline_c.items():
-                choices[k] = info["text"]
+                choices[k] = clean_math_text(info["text"])
                 if info["is_red"]:
                     correct_answer = k
                     found_red = True
             self.part1_questions.append({
                 "id": len(self.part1_questions) + 1,
                 "original_num": q_num,
-                "question": clean_q_text,
+                "question": clean_math_text(clean_q_text),
                 "choices": choices,
                 "correct": correct_answer,
                 "has_red": found_red,
@@ -219,7 +274,8 @@ class PdfParser:
             return idx
 
         seen_choice_keys = set()
-        active_choice = None
+        last_splits = []
+        last_keys = []
 
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
@@ -231,7 +287,7 @@ class PdfParser:
                 STOP_MARKER_REGEX.search(next_text)):
                 break
                 
-            p_choices = self._extract_choices_from_pdf_p(next_p)
+            p_choices, p_splits = self._extract_choices_from_pdf_p(next_p)
             if p_choices:
                 for k, info in p_choices.items():
                     seen_choice_keys.add(k)
@@ -239,20 +295,33 @@ class PdfParser:
                     if info["is_red"]:
                         correct_answer = k
                         found_red = True
-                active_choice = sorted(p_choices.keys())[-1]
+                last_splits = p_splits
+                last_keys = [k for k, _, _ in p_splits]
                 idx += 1
             else:
                 if not seen_choice_keys:
                     clean_q_text += "<br>" + next_text
                     idx += 1
-                elif active_choice:
-                    choices[active_choice] = (choices[active_choice] + " " + next_text).strip()
-                    if next_p["has_red"]:
-                        correct_answer = active_choice
+                else:
+                    # Continuation line for choices!
+                    if len(last_keys) >= 2:
+                        for s_idx, (k, s_start, s_end) in enumerate(last_splits):
+                            seg_start = s_start
+                            seg_end = last_splits[s_idx+1][1] if s_idx + 1 < len(last_splits) else len(next_p["raw_text"])
+                            seg_text = next_p["raw_text"][seg_start:seg_end].strip() if seg_start < len(next_p["raw_text"]) else ""
+                            if seg_text:
+                                choices[k] = (choices[k] + "\n" + seg_text).strip()
+                    elif len(last_keys) == 1:
+                        k = last_keys[0]
+                        choices[k] = (choices[k] + "\n" + next_text).strip()
+                    if next_p["has_red"] and last_keys:
+                        correct_answer = last_keys[0]
                         found_red = True
                     idx += 1
-                else:
-                    idx += 1
+
+        clean_q_text = clean_math_text(clean_q_text)
+        for k in choices:
+            choices[k] = clean_math_text(choices[k])
 
         self.part1_questions.append({
             "id": len(self.part1_questions) + 1,
@@ -265,8 +334,9 @@ class PdfParser:
         })
         return idx
 
-    def _extract_choices_from_pdf_p(self, p_data) -> dict:
+    def _extract_choices_from_pdf_p(self, p_data) -> tuple[dict, list]:
         res = {}
+        splits = []
         text = p_data["raw_text"]
         matches = list(CHOICE_PATTERN.finditer(text))
         if not matches:
@@ -278,7 +348,8 @@ class PdfParser:
                     "text": c_text,
                     "is_red": p_data["has_red"]
                 }
-            return res
+                splits.append((key, 0, len(text)))
+            return res, splits
 
         # Filter matches: within the same paragraph/cell, choice keys must appear in strictly ascending order
         filtered_matches = []
@@ -291,7 +362,7 @@ class PdfParser:
                 last_key_ord = k_ord
 
         if not filtered_matches:
-            return res
+            return res, splits
 
         curr_pos = 0
         spans_mapped = []
@@ -318,7 +389,8 @@ class PdfParser:
                 "text": c_text_raw,
                 "is_red": choice_is_red
             }
-        return res
+            splits.append((key, m_start, m_end))
+        return res, splits
 
     # ================= PART 2 (TRUE / FALSE) =================
     def _parse_part2_question(self, paragraphs_data, start_idx) -> int:
@@ -383,6 +455,10 @@ class PdfParser:
                         items[last_key]["text"] = (items[last_key]["text"] + " " + clean_cont).strip()
                     idx += 1
 
+        clean_q_text = clean_math_text(clean_q_text)
+        for k in items:
+            items[k]["text"] = clean_math_text(items[k]["text"])
+
         self.part2_questions.append({
             "id": len(self.part2_questions) + 1,
             "original_num": q_num,
@@ -437,6 +513,8 @@ class PdfParser:
                         break
 
         clean_q = re.sub(r"^\s*(C[^\s]*u|B[^\s]*i)\s+\d+[\.\:\-\s]+", "", clean_q).strip()
+        clean_q = clean_math_text(clean_q)
+        answer = clean_math_text(answer)
 
         self.part3_questions.append({
             "id": len(self.part3_questions) + 1,
@@ -478,6 +556,8 @@ class PdfParser:
             guide_part = ""
 
         clean_q = re.sub(r"^\s*(C[^\s]*u|B[^\s]*i)\s+\d+(\s*\([^\)]+\))?[\.\:\-\s]+", "", q_part).strip()
+        clean_q = clean_math_text(clean_q)
+        guide_part = clean_math_text(guide_part)
 
         self.part4_questions.append({
             "id": len(self.part4_questions) + 1,

@@ -12,7 +12,8 @@ from .formula_helper import (
     deserialize_oxml_elements,
     strip_elements_prefix,
     strip_elements_suffix,
-    heal_omath_element
+    heal_omath_element,
+    sanitize_latex_string
 )
 
 PART1_REGEX = re.compile(r"^\s*PHẦN\s+(I|1)[\.\:\s\-]", re.IGNORECASE)
@@ -226,11 +227,13 @@ class DocxParser:
                 if c_info.get("is_red"):
                     correct_answer = k
                     found_red = True
+            clean_q_text = sanitize_latex_string(clean_q_text)
+            c_dict = {k: sanitize_latex_string(v.get("text", "")) for k, v in choices.items()}
             self.part1_questions.append({
                 "id": len(self.part1_questions) + 1,
                 "original_num": q_num,
                 "question": clean_q_text,
-                "choices": {k: v.get("text", "") for k, v in choices.items()},
+                "choices": c_dict,
                 "choice_xmls": {k: v.get("xml_strings", []) for k, v in choices.items()},
                 "correct": correct_answer,
                 "has_red": found_red,
@@ -278,6 +281,10 @@ class DocxParser:
                     idx += 1
                 else:
                     idx += 1
+
+        clean_q_text = sanitize_latex_string(clean_q_text)
+        for k in choices:
+            choices[k] = sanitize_latex_string(choices[k])
 
         self.part1_questions.append({
             "id": len(self.part1_questions) + 1,
@@ -440,6 +447,10 @@ class DocxParser:
                         items[last_key]["xml_strings"].extend(cont_xmls)
                     idx += 1
 
+        clean_q_text = sanitize_latex_string(clean_q_text)
+        for k in items:
+            items[k]["text"] = sanitize_latex_string(items[k]["text"])
+
         self.part2_questions.append({
             "id": len(self.part2_questions) + 1,
             "original_num": q_num,
@@ -513,6 +524,8 @@ class DocxParser:
 
         # Remove "Câu X:"
         clean_q = re.sub(r"^\s*(Câu|Bài)\s+\d+[\.\:\-\s]+", "", clean_q).strip()
+        clean_q = sanitize_latex_string(clean_q)
+        answer = sanitize_latex_string(answer)
 
         self.part3_questions.append({
             "id": len(self.part3_questions) + 1,
@@ -563,6 +576,8 @@ class DocxParser:
         # Remove "Câu X (X điểm):"
         clean_q = re.sub(r"^\s*(Câu|Bài)\s+\d+(\s*\([^\)]+\))?[\.\:\-\s]+", "", q_part).strip()
         clean_q = re.sub(r"(\<br\>)?\s*(?:Hướng\s*dẫn\s*chấm|HD\s*chấm|Lời\s*giải)\s*[\:\=\s\n]+.*", "", clean_q, flags=re.IGNORECASE | re.DOTALL).strip()
+        clean_q = sanitize_latex_string(clean_q)
+        guide_part = sanitize_latex_string(guide_part)
 
         self.part4_questions.append({
             "id": len(self.part4_questions) + 1,

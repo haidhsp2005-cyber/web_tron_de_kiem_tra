@@ -625,7 +625,35 @@ class DocxExporter:
             if not token:
                 continue
             if token.startswith("$") and token.endswith("$") and len(token) > 2:
-                math_inner = token[1:-1]
+                math_inner = token[1:-1].strip()
+                if "\\begin{cases}" in math_inner:
+                    m_cases = re.search(r"\\begin\{cases\}([\s\S]*?)\\end\{cases\}", math_inner)
+                    if m_cases:
+                        rows = [r.strip() for r in m_cases.group(1).split(r"\\") if r.strip()]
+                        color_w = '<w:color w:val="DC2626"/><w:b/>' if is_red else ''
+                        rows_xml = "".join(f'<m:e><m:r><w:rPr>{color_w}</w:rPr><m:t>{r}</m:t></m:r></m:e>' for r in rows)
+                        xml_str = (
+                            f'<m:oMath {nsdecls("m")} {nsdecls("w")}>'
+                            f'<m:d>'
+                            f'<m:dPr><m:begChr m:val="{{"/><m:endChr m:val=""/></m:dPr>'
+                            f'<m:e><m:eqArr>{rows_xml}</m:eqArr></m:e>'
+                            f'</m:d>'
+                            f'</m:oMath>'
+                        )
+                        paragraph._p.append(parse_xml(xml_str))
+                        continue
+                elif "\\vec" in math_inner:
+                    m_vec = re.search(r"\\vec\{([A-Za-z0-9]{1,4})\}", math_inner)
+                    if m_vec:
+                        v_name = m_vec.group(1)
+                        color_w = '<w:color w:val="DC2626"/><w:b/>' if is_red else ''
+                        xml_str = (
+                            f'<m:oMath {nsdecls("m")} {nsdecls("w")}>'
+                            f'<m:acc><m:accPr><m:chr m:val="⃗"/></m:accPr><m:e><m:r><w:rPr>{color_w}</w:rPr><m:t>{v_name}</m:t></m:r></m:e></m:acc>'
+                            f'</m:oMath>'
+                        )
+                        paragraph._p.append(parse_xml(xml_str))
+                        continue
                 math_clean = math_inner.replace("\\frac", "").replace("\\sqrt", "√").replace("\\int", "∫").replace("\\vec", "").replace("{", "").replace("}", "")
                 r = paragraph.add_run(math_clean)
                 r.italic = True

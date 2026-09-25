@@ -777,11 +777,38 @@ function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
-// Convert unicode vector markers to LaTeX \vec for crisp KaTeX rendering
+// Clean and format math formulas for crisp KaTeX rendering across Grade 6-12
 function formatMathPreview(html) {
     if (!html) return "";
     let s = String(html);
-    // Convert unicode vector arrows (e.g. u\u20d7, a\u20d7, u⃗, a⃗, AB⃗) into KaTeX $\vec{...}$
+
+    // 1. Repair malformed / broken system of equations LaTeX (from Word/online banks):
+    // E.g.: ${\begin{aligned} ... \end{aligned}$ -> $\begin{cases} ... \end{cases}$
+    s = s.replace(/\$\s*\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?\s*\$/g, "$\\begin{cases}$1\\end{cases}$");
+    s = s.replace(/\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\}?/g, "\\begin{cases}$1\\end{cases}");
+    s = s.replace(/\\left\\{\s*\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}\s*\\right\.?/g, "\\begin{cases}$1\\end{cases}");
+    s = s.replace(/\\begin\{aligned\}([\s\S]*?)\\end\{aligned\}/g, "\\begin{cases}$1\\end{cases}");
+
+    // 2. Repair ${\begin{cases} ... \end{cases}$ or redundant outer braces
+    s = s.replace(/\$\s*\{\s*\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*\}?\s*\$/g, "$\\begin{cases}$1\\end{cases}$");
+    s = s.replace(/\{\s*\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*\}?/g, "\\begin{cases}$1\\end{cases}");
+
+    // 3. Ensure any standalone \begin{cases} not wrapped in $ is wrapped
+    s = s.replace(/(?<!\$)\\begin\{cases\}([\s\S]*?)\\end\{cases\}(?!\$)/g, "$\\begin{cases}$1\\end{cases}$");
+
+    // 4. Convert unicode vector arrows (e.g. u\u20d7, a\u20d7, u⃗, a⃗, AB⃗) into KaTeX $\vec{...}$
     s = s.replace(/([A-Za-z]{1,3})[\u20D7\u2192\u20D6⃗]/g, "$\\vec{$1}$");
+    s = s.replace(/(?<!\$)\\vec\s*\{([A-Za-z0-9]{1,4})\}(?!\$)/g, "$\\vec{$1}$");
+
+    // 5. Ensure common standalone LaTeX math commands are wrapped in $ if naked:
+    s = s.replace(/(?<!\$)\\frac\{([^{}]+)\}\{([^{}]+)\}(?!\$)/g, "$\\frac{$1}{$2}$");
+    s = s.replace(/(?<!\$)\\sqrt\{([^{}]+)\}(?!\$)/g, "$\\sqrt{$1}$");
+    s = s.replace(/(?<!\$)\\sqrt\[([^\[\]]+)\]\{([^{}]+)\}(?!\$)/g, "$\\sqrt[$1]{$2}$");
+
+    // 6. Clean up soft hyphens and unicode artifacts from PDF
+    s = s.replace(/\u00ad/g, "-");
+    s = s.replace(/\u2212/g, "-");
+    s = s.replace(/\u037e/g, ";");
+
     return s;
 }
