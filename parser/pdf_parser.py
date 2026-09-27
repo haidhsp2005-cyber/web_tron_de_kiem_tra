@@ -332,7 +332,7 @@ class PdfParser:
         found_red = False
         images = []
         if p_data.get("is_image"):
-            images.append({"data": p_data["image_data"], "bytes": p_data["image_bytes"], "ext": p_data["image_ext"]})
+            images.append({"data": p_data["image_data"], "ext": p_data["image_ext"]})
 
         idx = start_idx + 1
         # Check inline choices
@@ -385,7 +385,7 @@ class PdfParser:
                 if not seen_choice_keys:
                     clean_q_text += "<br>" + next_fmt
                     if next_p.get("is_image"):
-                        images.append({"data": next_p["image_data"], "bytes": next_p["image_bytes"], "ext": next_p["image_ext"]})
+                        images.append({"data": next_p["image_data"], "ext": next_p["image_ext"]})
                     idx += 1
                 else:
                     # Continuation line for choices!
@@ -496,7 +496,7 @@ class PdfParser:
         }
         images = []
         if p_data.get("is_image"):
-            images.append({"data": p_data["image_data"], "bytes": p_data["image_bytes"], "ext": p_data["image_ext"]})
+            images.append({"data": p_data["image_data"], "ext": p_data["image_ext"]})
 
         last_key = None
         idx = start_idx + 1
@@ -534,7 +534,7 @@ class PdfParser:
                 if last_key is None:
                     clean_q_text += "<br>" + next_fmt
                     if next_p.get("is_image"):
-                        images.append({"data": next_p["image_data"], "bytes": next_p["image_bytes"], "ext": next_p["image_ext"]})
+                        images.append({"data": next_p["image_data"], "ext": next_p["image_ext"]})
                     idx += 1
                 else:
                     if next_p.get("is_image"):
@@ -578,7 +578,7 @@ class PdfParser:
         q_parts = [fmt_text]
         images = []
         if p_data.get("is_image"):
-            images.append({"data": p_data["image_data"], "bytes": p_data["image_bytes"], "ext": p_data["image_ext"]})
+            images.append({"data": p_data["image_data"], "ext": p_data["image_ext"]})
 
         idx = start_idx + 1
         while idx < len(paragraphs_data):
@@ -592,7 +592,7 @@ class PdfParser:
                 break
             q_parts.append(next_fmt)
             if next_p.get("is_image"):
-                images.append({"data": next_p["image_data"], "bytes": next_p["image_bytes"], "ext": next_p["image_ext"]})
+                images.append({"data": next_p["image_data"], "ext": next_p["image_ext"]})
             idx += 1
 
         full_html = "<br>".join(q_parts)
@@ -645,7 +645,7 @@ class PdfParser:
         q_parts = [fmt_text]
         images = []
         if p_data.get("is_image"):
-            images.append({"data": p_data["image_data"], "bytes": p_data["image_bytes"], "ext": p_data["image_ext"]})
+            images.append({"data": p_data["image_data"], "ext": p_data["image_ext"]})
 
         idx = start_idx + 1
         while idx < len(paragraphs_data):
@@ -659,7 +659,7 @@ class PdfParser:
                 break
             q_parts.append(next_fmt)
             if next_p.get("is_image"):
-                images.append({"data": next_p["image_data"], "bytes": next_p["image_bytes"], "ext": next_p["image_ext"]})
+                images.append({"data": next_p["image_data"], "ext": next_p["image_ext"]})
             idx += 1
 
         full_html = "<br>".join(q_parts)

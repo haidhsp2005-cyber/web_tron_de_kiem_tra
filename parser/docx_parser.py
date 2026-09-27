@@ -136,7 +136,6 @@ class DocxParser:
                     return {
                         "formatted_text": f'<div class="exam-image-wrap" style="text-align:center;margin:6px 0;"><img src="{data_uri}" style="max-width:100%;max-height:350px;" class="exam-figure" /></div>',
                         "data": data_uri,
-                        "bytes": img_bytes,
                         "ext": ext
                     }
 
@@ -156,7 +155,6 @@ class DocxParser:
                     return {
                         "formatted_text": f'<div class="exam-image-wrap" style="text-align:center;margin:6px 0;"><img src="{data_uri}" style="max-width:100%;max-height:350px;" class="exam-figure" /></div>',
                         "data": data_uri,
-                        "bytes": img_bytes,
                         "ext": ext
                     }
         except Exception:
