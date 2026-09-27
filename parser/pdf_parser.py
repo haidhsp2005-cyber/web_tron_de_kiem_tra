@@ -96,7 +96,8 @@ def clean_math_text(text: str) -> str:
             if l_clean:
                 clean_lines.append(l_clean)
         if clean_lines:
-            return f"$\\begin{{cases}} {' \\\\ '.join(clean_lines)} \\end{{cases}}$"
+            joined = ' \\\\ '.join(clean_lines)
+            return f"$\\begin{{cases}} {joined} \\end{{cases}}$"
         return block
 
     pattern_unicode = re.compile(r"[⎧\u23a7][^\n\r<]*(?:(?:<br\s*/?>|[\n\r]+)[^⎩\u23a9\n\r<]*)*[⎩\u23a9][^\n\r<]*")
@@ -112,7 +113,8 @@ def clean_math_text(text: str) -> str:
         if eq3 and any(op in eq3 for op in ["=", "<", ">", "≤", "≥", "≠"]):
             eqs.append(eq3)
         if any(op in eq1 for op in ["=", "<", ">", "≤", "≥", "≠"]) and any(op in eq2 for op in ["=", "<", ">", "≤", "≥", "≠"]):
-            return f"$\\begin{{cases}} {' \\\\ '.join(eqs)} \\end{{cases}}$"
+            joined_eqs = ' \\\\ '.join(eqs)
+            return f"$\\begin{{cases}} {joined_eqs} \\end{{cases}}$"
         return m.group(0)
     s = pattern_brace.sub(repl_brace, s)
 
