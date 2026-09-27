@@ -1,5 +1,7 @@
 import os
 import re
+import io
+import base64
 import docx
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
@@ -603,6 +605,12 @@ class DocxExporter:
 
     def _append_elements_or_text(self, paragraph, xml_strings: list[str], fallback_text: str, is_red: bool = False, strip_red: bool = False, strip_bold: bool = False):
         """Appends native OMML/docx runs from xml_strings, or falls back to formatted text."""
+        # If fallback_text contains images or tables, format via _insert_formatted_text
+        # because OpenXML drawings cannot be deserialized into a different document without missing relationship parts.
+        if "<img" in str(fallback_text) or "<table" in str(fallback_text):
+            self._insert_formatted_text(paragraph, fallback_text, is_red=is_red)
+            return
+
         if xml_strings:
             elements = deserialize_oxml_elements(xml_strings)
             for elem in elements:
@@ -617,10 +625,10 @@ class DocxExporter:
         else:
             self._insert_formatted_text(paragraph, fallback_text, is_red=is_red)
 
-
-    def _insert_formatted_text(self, paragraph, html_text: str, is_red: bool = False):
-        """Splits HTML into text, math ($...$), and sub/sup tags and inserts corresponding docx runs."""
-        clean_str = str(html_text).replace("<br>", "\n").replace("<br/>", "\n")
+    def _insert_text_or_math(self, paragraph, text_snippet: str, is_red: bool = False):
+        """Inserts text, OMML math formulas, and sub/sup tags into paragraph."""
+        clean_str = str(text_snippet).replace("<br>", "\n").replace("<br/>", "\n")
+        clean_str = re.sub(r'</?(?:div|span|p|figure)[^>]*>', '', clean_str)
         tokens = re.split(r"(\$[^\$]+\$|<sub>.*?</sub>|<sup>.*?</sup>)", clean_str, flags=re.IGNORECASE)
         for token in tokens:
             if not token:
@@ -694,6 +702,111 @@ class DocxExporter:
                 r = paragraph.add_run(token)
                 if is_red:
                     r.font.color.rgb = RED_COLOR
+
+    def _insert_formatted_text(self, paragraph, html_text: str, is_red: bool = False):
+        """Splits HTML into text, images, and tables, creating paragraphs, tables and images in exact order."""
+        if not html_text:
+            return
+
+        block_pattern = re.compile(
+            r'(<div class="exam-image-wrap"[^>]*>[\s\S]*?</div>|<img\s+[^>]*src=["\'][^"\']+["\'][^>]*>|<div class="exam-table-wrap"[^>]*>[\s\S]*?</div>|<table[\s\S]*?</table>)',
+            re.IGNORECASE
+        )
+        if not block_pattern.search(html_text):
+            self._insert_text_or_math(paragraph, html_text, is_red=is_red)
+            return
+
+        doc_or_cell = paragraph._parent
+        is_cell = isinstance(doc_or_cell, docx.table._Cell)
+        cur_p = paragraph
+        last_pos = 0
+
+        for m in block_pattern.finditer(html_text):
+            before_chunk = html_text[last_pos:m.start()].strip()
+            if before_chunk:
+                if cur_p is None:
+                    cur_p = doc_or_cell.add_paragraph()
+                    cur_p.paragraph_format.space_before = Pt(2)
+                    cur_p.paragraph_format.space_after = Pt(2)
+                    cur_p.paragraph_format.line_spacing = 1.15
+                self._insert_text_or_math(cur_p, before_chunk, is_red=is_red)
+
+            block = m.group(1)
+            if "<img" in block.lower():
+                src_m = re.search(r'src=["\']([^"\']+)["\']', block, re.IGNORECASE)
+                if src_m:
+                    src_val = src_m.group(1)
+                    b64_data = ""
+                    if "base64," in src_val:
+                        b64_data = src_val.split("base64,")[1]
+                    elif re.match(r'^[A-Za-z0-9+/=]+$', src_val):
+                        b64_data = src_val
+                    
+                    if b64_data:
+                        try:
+                            img_bytes = base64.b64decode(b64_data)
+                            p_img = doc_or_cell.add_paragraph()
+                            p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            p_img.paragraph_format.space_before = Pt(4)
+                            p_img.paragraph_format.space_after = Pt(4)
+                            p_img.paragraph_format.line_spacing = 1.0
+
+                            max_w = 2.8 if is_cell else 3.8
+                            img_w = Inches(max_w)
+                            try:
+                                from PIL import Image
+                                with Image.open(io.BytesIO(img_bytes)) as pil_img:
+                                    pw, ph = pil_img.size
+                                    w_in = pw / 130.0
+                                    h_in = ph / 130.0
+                                    scale = min(max_w / w_in if w_in > max_w else 1.0, 3.5 / h_in if h_in > 3.5 else 1.0)
+                                    img_w = Inches(w_in * scale)
+                            except Exception:
+                                pass
+
+                            r_img = p_img.add_run()
+                            r_img.add_picture(io.BytesIO(img_bytes), width=img_w)
+                        except Exception as e:
+                            pass
+                cur_p = None
+
+            elif "<table" in block.lower():
+                rows = re.findall(r'<tr[^>]*>([\s\S]*?)</tr>', block, re.IGNORECASE)
+                if rows:
+                    parsed_rows = []
+                    for r_html in rows:
+                        cells = re.findall(r'<td[^>]*>([\s\S]*?)</td>', r_html, re.IGNORECASE)
+                        parsed_rows.append(cells)
+                    if parsed_rows:
+                        num_rows = len(parsed_rows)
+                        num_cols = max(len(r) for r in parsed_rows)
+                        if num_cols > 0:
+                            if is_cell:
+                                tbl = doc_or_cell.add_table(rows=num_rows, cols=num_cols, width=Inches(3.0))
+                            else:
+                                tbl = doc_or_cell.add_table(rows=num_rows, cols=num_cols)
+                            tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+                            for r_i, r_data in enumerate(parsed_rows):
+                                for c_i, c_html in enumerate(r_data):
+                                    c_elem = tbl.cell(r_i, c_i)
+                                    set_cell_box_border(c_elem, color="475569", sz="4")
+                                    cp = c_elem.paragraphs[0]
+                                    cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                    cp.paragraph_format.space_before = Pt(2)
+                                    cp.paragraph_format.space_after = Pt(2)
+                                    self._insert_text_or_math(cp, c_html, is_red=is_red)
+                cur_p = None
+
+            last_pos = m.end()
+
+        remaining_chunk = html_text[last_pos:].strip()
+        if remaining_chunk:
+            if cur_p is None:
+                cur_p = doc_or_cell.add_paragraph()
+                cur_p.paragraph_format.space_before = Pt(2)
+                cur_p.paragraph_format.space_after = Pt(2)
+                cur_p.paragraph_format.line_spacing = 1.15
+            self._insert_text_or_math(cur_p, remaining_chunk, is_red=is_red)
 
     def _generate_summary_docx(self, file_path: str):
         """Generates comprehensive summary answer keys DOCX with clear tables for all 4 parts."""

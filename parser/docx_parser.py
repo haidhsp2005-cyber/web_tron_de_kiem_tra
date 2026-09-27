@@ -117,6 +117,103 @@ class DocxParser:
             }
         }
 
+    def _extract_image_from_element(self, elem):
+        """Extracts embedded image bytes from <w:drawing> or <w:pict> inside an OpenXML element."""
+        try:
+            # 1. DrawingML (<w:drawing>)
+            for blip in elem.iter(qn("a:blip")):
+                rId = blip.get(qn("r:embed")) or blip.get(qn("r:link"))
+                if rId and hasattr(self.doc, "part") and rId in self.doc.part.rels:
+                    target_part = self.doc.part.rels[rId].target_part
+                    img_bytes = target_part.blob
+                    c_type = target_part.content_type
+                    ext = c_type.split("/")[-1] if "/" in c_type else "png"
+                    if ext == "jpeg":
+                        ext = "jpg"
+                    import base64
+                    b64 = base64.b64encode(img_bytes).decode("ascii")
+                    data_uri = f"data:{c_type};base64,{b64}"
+                    return {
+                        "formatted_text": f'<div class="exam-image-wrap" style="text-align:center;margin:6px 0;"><img src="{data_uri}" style="max-width:100%;max-height:350px;" class="exam-figure" /></div>',
+                        "data": data_uri,
+                        "bytes": img_bytes,
+                        "ext": ext
+                    }
+
+            # 2. VML shapes (<w:pict>)
+            for idata in elem.iter(qn("v:imagedata")):
+                rId = idata.get(qn("r:id")) or idata.get(qn("o:relid"))
+                if rId and hasattr(self.doc, "part") and rId in self.doc.part.rels:
+                    target_part = self.doc.part.rels[rId].target_part
+                    img_bytes = target_part.blob
+                    c_type = target_part.content_type
+                    ext = c_type.split("/")[-1] if "/" in c_type else "png"
+                    if ext == "jpeg":
+                        ext = "jpg"
+                    import base64
+                    b64 = base64.b64encode(img_bytes).decode("ascii")
+                    data_uri = f"data:{c_type};base64,{b64}"
+                    return {
+                        "formatted_text": f'<div class="exam-image-wrap" style="text-align:center;margin:6px 0;"><img src="{data_uri}" style="max-width:100%;max-height:350px;" class="exam-figure" /></div>',
+                        "data": data_uri,
+                        "bytes": img_bytes,
+                        "ext": ext
+                    }
+        except Exception:
+            pass
+        return None
+
+    def _process_table(self, tbl, child):
+        from xml.etree.ElementTree import tostring
+        rows_html = []
+        raw_rows = []
+        images = []
+        for row in tbl.rows:
+            cells_html = []
+            row_raw_parts = []
+            for cell in row.cells:
+                cell_formatted = []
+                cell_raw = []
+                for cp in cell.paragraphs:
+                    res = self._process_paragraph(cp)
+                    if res["formatted_text"].strip():
+                        cell_formatted.append(res["formatted_text"])
+                    if res["raw_text"].strip():
+                        cell_raw.append(res["raw_text"])
+                    if res.get("images"):
+                        images.extend(res["images"])
+                c_html = "<br>".join(cell_formatted)
+                c_raw = " ".join(cell_raw)
+                cells_html.append(f'<td style="border:1px solid #475569;padding:6px 10px;min-width:32px;">{c_html}</td>')
+                row_raw_parts.append(c_raw)
+            rows_html.append(f'<tr>{"".join(cells_html)}</tr>')
+            raw_rows.append(" | ".join(row_raw_parts))
+
+        if not rows_html:
+            return None
+
+        table_html = (
+            '<div class="exam-table-wrap" style="text-align:center;margin:8px auto;overflow-x:auto;">'
+            f'<table class="exam-table" border="1" style="border-collapse:collapse;margin:0 auto;text-align:center;border:1px solid #475569;background:#fff;">'
+            f'{"".join(rows_html)}'
+            '</table>'
+            '</div>'
+        )
+        try:
+            xml_str = tostring(child, encoding="unicode")
+        except Exception:
+            xml_str = ""
+
+        return {
+            "raw_text": "[Bảng dữ liệu/biến thiên]\n" + "\n".join(raw_rows),
+            "formatted_text": table_html,
+            "has_red": False,
+            "oxml_elements": [child],
+            "xml_strings": [xml_str] if xml_str else [],
+            "images": images,
+            "is_table": True
+        }
+
     def _extract_paragraphs_with_runs(self) -> list[dict]:
         """Extracts text, formatted HTML, red flags and oxml elements from document paragraphs & tables in exact document order."""
         items = []
@@ -126,28 +223,54 @@ class DocxParser:
             if tag == "p":
                 p = docx.text.paragraph.Paragraph(child, self.doc)
                 item = self._process_paragraph(p)
-                if item["raw_text"].strip():
+                if item["raw_text"].strip() or item.get("images"):
                     items.append(item)
             elif tag == "tbl":
                 tbl = docx.table.Table(child, self.doc)
+                is_choices_table = False
+                all_cell_texts = []
                 for row in tbl.rows:
                     for cell in row.cells:
-                        for cp in cell.paragraphs:
-                            item = self._process_paragraph(cp)
-                            if item["raw_text"].strip():
-                                items.append(item)
+                        c_txt = "".join(p.text for p in cell.paragraphs).strip()
+                        if c_txt:
+                            all_cell_texts.append(c_txt)
+                
+                choice_starts = sum(1 for t in all_cell_texts if re.match(r"^[A-D][\.\:\)]", t))
+                if choice_starts >= 2 and len(all_cell_texts) <= 6:
+                    is_choices_table = True
+                    
+                if is_choices_table:
+                    for row in tbl.rows:
+                        for cell in row.cells:
+                            for cp in cell.paragraphs:
+                                item = self._process_paragraph(cp)
+                                if item["raw_text"].strip() or item.get("images"):
+                                    items.append(item)
+                else:
+                    # Variation table (bảng biến thiên) or data table!
+                    tbl_item = self._process_table(tbl, child)
+                    if tbl_item:
+                        items.append(tbl_item)
         return items
 
     def _process_paragraph(self, p) -> dict:
         formatted_parts = []
         raw_parts = []
         oxml_elements = []
+        images = []
         has_red = False
 
         for child in p._p:
             tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
             if tag in ["r", "oMath", "oMathPara"]:
                 heal_omath_element(child)
+                # Check for embedded drawing/image
+                img_info = self._extract_image_from_element(child)
+                if img_info:
+                    formatted_parts.append(img_info["formatted_text"])
+                    raw_parts.append("[Hình minh họa]\n")
+                    images.append(img_info)
+
                 text, is_red = extract_element_text_with_formatting(child)
                 if text:
                     formatted_parts.append(text)
@@ -166,7 +289,8 @@ class DocxParser:
             "formatted_text": "".join(formatted_parts),
             "has_red": has_red,
             "oxml_elements": oxml_elements,
-            "xml_strings": serialize_oxml_elements(oxml_elements)
+            "xml_strings": serialize_oxml_elements(oxml_elements),
+            "images": images
         }
 
     def _check_metadata(self, text: str):
@@ -216,6 +340,9 @@ class DocxParser:
         correct_answer = "A" # Default if not found
         choice_xmls = {"A": [], "B": [], "C": [], "D": []}
         found_red = False
+        images = []
+        if p_data.get("images"):
+            images.extend(p_data["images"])
 
         # Look forward for choices
         idx = start_idx + 1
@@ -237,6 +364,7 @@ class DocxParser:
                 "choice_xmls": {k: v.get("xml_strings", []) for k, v in choices.items()},
                 "correct": correct_answer,
                 "has_red": found_red,
+                "images": images,
                 "xml_strings": clean_q_xmls
             })
             return idx
@@ -271,6 +399,8 @@ class DocxParser:
                 if not seen_choice_keys:
                     clean_q_text += "<br>" + next_p["formatted_text"]
                     clean_q_xmls.extend(next_p["xml_strings"])
+                    if next_p.get("images"):
+                        images.extend(next_p["images"])
                     idx += 1
                 elif active_choice:
                     choices[active_choice] = (choices[active_choice] + " " + next_p["formatted_text"]).strip()
@@ -294,6 +424,7 @@ class DocxParser:
             "choice_xmls": choice_xmls,
             "correct": correct_answer,
             "has_red": found_red,
+            "images": images,
             "xml_strings": clean_q_xmls
         })
         return idx
@@ -386,6 +517,10 @@ class DocxParser:
             "c": {"text": "", "correct": False},
             "d": {"text": "", "correct": False}
         }
+        images = []
+        if p_data.get("images"):
+            images.extend(p_data["images"])
+
         last_key = None
         idx = start_idx + 1
         while idx < len(paragraphs_data):
@@ -429,6 +564,8 @@ class DocxParser:
                     # Additional paragraph of the stem before any a), b), c), d)
                     clean_q_text += "<br>" + next_p["formatted_text"]
                     clean_q_xmls.extend(next_p["xml_strings"])
+                    if next_p.get("images"):
+                        images.extend(next_p["images"])
                     idx += 1
                 else:
                     # Multi-paragraph/continuation of the current item (e.g. item a)
@@ -456,6 +593,7 @@ class DocxParser:
             "original_num": q_num,
             "question": clean_q_text,
             "items": items,
+            "images": images,
             "xml_strings": clean_q_xmls
         })
         return idx
@@ -470,6 +608,9 @@ class DocxParser:
         full_text = p_data["formatted_text"]
         full_raw = raw_text
         clean_q_xmls = strip_elements_prefix(p_data["xml_strings"], r"^\s*(Câu|Bài)\s+\d+[\.\:\-\s]*")
+        images = []
+        if p_data.get("images"):
+            images.extend(p_data["images"])
         
         idx = start_idx + 1
         while idx < len(paragraphs_data):
@@ -483,6 +624,8 @@ class DocxParser:
             full_text += "<br>" + next_p["formatted_text"]
             clean_q_xmls.extend(next_p["xml_strings"])
             full_raw += "\n" + next_text
+            if next_p.get("images"):
+                images.extend(next_p["images"])
             idx += 1
 
         # Extract answer: either after "Đáp án:" or red runs
@@ -534,6 +677,7 @@ class DocxParser:
             "original_num": q_num,
             "question": clean_q,
             "answer": answer,
+            "images": images,
             "xml_strings": clean_q_xmls
         })
         return idx
@@ -547,6 +691,9 @@ class DocxParser:
         
         full_text = p_data["formatted_text"]
         clean_q_xmls = strip_elements_prefix(p_data["xml_strings"], r"^\s*(Câu|Bài)\s+\d+(\s*\([^\)]+\))?[\.\:\-\s]*")
+        images = []
+        if p_data.get("images"):
+            images.extend(p_data["images"])
         
         idx = start_idx + 1
         while idx < len(paragraphs_data):
@@ -559,6 +706,8 @@ class DocxParser:
                 break
             full_text += "<br>" + next_p["formatted_text"]
             clean_q_xmls.extend(next_p["xml_strings"])
+            if next_p.get("images"):
+                images.extend(next_p["images"])
             idx += 1
 
         # Separate question and grading guide / answer if marked
@@ -586,6 +735,7 @@ class DocxParser:
             "original_num": q_num,
             "question": clean_q,
             "guide": guide_part,
+            "images": images,
             "xml_strings": clean_q_xmls
         })
         return idx

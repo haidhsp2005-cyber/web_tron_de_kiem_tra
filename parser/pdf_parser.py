@@ -133,6 +133,23 @@ def clean_math_text(text: str) -> str:
 
     return s
 
+def safe_clean_math_text(text: str) -> str:
+    """Safely runs clean_math_text while preserving <img> and <div ...> tags with base64 data intact."""
+    if not text:
+        return ""
+    tag_pattern = re.compile(r'(<div[^>]*class=["\']exam-image-wrap["\'][^>]*>[\s\S]*?</div>|<img[^>]+>)', re.IGNORECASE)
+    placeholders = []
+    def save_tag(m):
+        idx = len(placeholders)
+        placeholders.append(m.group(0))
+        return f"__EXAM_IMAGE_PLACEHOLDER_{idx}__"
+    
+    masked_text = tag_pattern.sub(save_tag, text)
+    cleaned = clean_math_text(masked_text)
+    for idx, orig_tag in enumerate(placeholders):
+        cleaned = cleaned.replace(f"__EXAM_IMAGE_PLACEHOLDER_{idx}__", orig_tag)
+    return cleaned
+
 class PdfParser:
     def __init__(self, file_path: str):
         self.file_path = file_path
@@ -218,35 +235,75 @@ class PdfParser:
         }
 
     def _extract_paragraphs_from_pdf(self) -> list[dict]:
+        import base64
         paragraphs = []
         for page in self.doc:
             page_dict = page.get_text("dict")
+            page_items = []
+            
             for block in page_dict.get("blocks", []):
-                if "lines" not in block:
-                    continue
-                for line in block["lines"]:
-                    line_spans = []
-                    raw_line = ""
-                    has_red = False
-                    for span in line["spans"]:
-                        txt = span["text"]
-                        color = span.get("color", 0)
-                        is_red = is_rgb_red(color)
-                        if is_red:
-                            has_red = True
-                        line_spans.append({
-                            "text": txt,
-                            "is_red": is_red,
-                            "bbox": span.get("bbox", [])
+                btype = block.get("type")
+                bbox = block.get("bbox", [0, 0, 0, 0])
+                
+                # Image block
+                if btype == 1:
+                    img_bytes = block.get("image")
+                    ext = block.get("ext", "png")
+                    if img_bytes:
+                        b64 = base64.b64encode(img_bytes).decode("ascii")
+                        mime = f"image/{ext}" if ext != "jpg" else "image/jpeg"
+                        data_uri = f"data:{mime};base64,{b64}"
+                        page_items.append({
+                            "type": "image",
+                            "y0": bbox[1],
+                            "x0": bbox[0],
+                            "bbox": bbox,
+                            "raw_text": "[Hình minh họa]",
+                            "formatted_text": f'<div class="exam-image-wrap" style="text-align:center;margin:6px 0;"><img src="{data_uri}" style="max-width:100%;max-height:350px;" class="exam-figure" /></div>',
+                            "has_red": False,
+                            "is_image": True,
+                            "image_data": data_uri,
+                            "image_bytes": img_bytes,
+                            "image_ext": ext,
+                            "spans": []
                         })
-                        raw_line += txt
-                    
-                    if raw_line.strip():
-                        paragraphs.append({
-                            "raw_text": raw_line.strip(),
-                            "spans": line_spans,
-                            "has_red": has_red
-                        })
+                elif btype == 0:
+                    for line in block.get("lines", []):
+                        line_spans = []
+                        raw_line = ""
+                        has_red = False
+                        for span in line.get("spans", []):
+                            txt = span.get("text", "")
+                            c = span.get("color", 0)
+                            is_red = is_rgb_red(c)
+                            if is_red:
+                                has_red = True
+                            line_spans.append({
+                                "text": txt,
+                                "is_red": is_red,
+                                "bbox": span.get("bbox", [])
+                            })
+                            raw_line += txt
+                        
+                        clean_raw = raw_line.strip()
+                        # Skip header/footer line markers
+                        if clean_raw and not re.search(r"^\s*Mã\s*đề[\:\s]+\d+.*Trang\s+\d+", clean_raw, re.IGNORECASE) and not re.search(r"^\s*Trang\s+\d+/\d+\s*$", clean_raw, re.IGNORECASE):
+                            l_bbox = line.get("bbox", [0, 0, 0, 0])
+                            page_items.append({
+                                "type": "text",
+                                "y0": l_bbox[1],
+                                "x0": l_bbox[0],
+                                "bbox": l_bbox,
+                                "raw_text": clean_raw,
+                                "formatted_text": clean_raw,
+                                "spans": line_spans,
+                                "has_red": has_red,
+                                "is_image": False
+                            })
+            # Sort items on each page in natural vertical reading order
+            page_items.sort(key=lambda it: (it["y0"], it["x0"]))
+            paragraphs.extend(page_items)
+            
         return paragraphs
 
     def _check_metadata(self, text: str):
@@ -265,30 +322,35 @@ class PdfParser:
     def _parse_part1_question(self, paragraphs_data, start_idx) -> int:
         p_data = paragraphs_data[start_idx]
         raw_text = p_data["raw_text"]
+        fmt_text = p_data.get("formatted_text", raw_text)
         q_match = QUESTION_REGEX.search(raw_text)
         q_num = int(q_match.group(2)) if q_match else len(self.part1_questions) + 1
         
-        clean_q_text = re.sub(r"^\s*(Câu|Bài)\s+\d+[\.\:\-\s]+", "", raw_text).strip()
+        clean_q_text = re.sub(r"^\s*(Câu|Bài)\s+\d+[\.\:\-\s]+", "", fmt_text).strip()
         choices = {"A": "", "B": "", "C": "", "D": ""}
         correct_answer = "A"
         found_red = False
+        images = []
+        if p_data.get("is_image"):
+            images.append({"data": p_data["image_data"], "bytes": p_data["image_bytes"], "ext": p_data["image_ext"]})
 
         idx = start_idx + 1
         # Check inline choices
         inline_c, inline_splits = self._extract_choices_from_pdf_p(p_data)
         if len(inline_c) >= 2:
             for k, info in inline_c.items():
-                choices[k] = clean_math_text(info["text"])
+                choices[k] = safe_clean_math_text(info["text"])
                 if info["is_red"]:
                     correct_answer = k
                     found_red = True
             self.part1_questions.append({
                 "id": len(self.part1_questions) + 1,
                 "original_num": q_num,
-                "question": clean_math_text(clean_q_text),
+                "question": safe_clean_math_text(clean_q_text),
                 "choices": choices,
                 "correct": correct_answer,
                 "has_red": found_red,
+                "images": images,
                 "xml_strings": []
             })
             return idx
@@ -300,6 +362,7 @@ class PdfParser:
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
             next_text = next_p["raw_text"].strip()
+            next_fmt = next_p.get("formatted_text", next_text)
             
             if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
                 PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
@@ -320,11 +383,15 @@ class PdfParser:
                 idx += 1
             else:
                 if not seen_choice_keys:
-                    clean_q_text += "<br>" + next_text
+                    clean_q_text += "<br>" + next_fmt
+                    if next_p.get("is_image"):
+                        images.append({"data": next_p["image_data"], "bytes": next_p["image_bytes"], "ext": next_p["image_ext"]})
                     idx += 1
                 else:
                     # Continuation line for choices!
-                    if len(last_keys) >= 2:
+                    if next_p.get("is_image") and last_keys:
+                        choices[last_keys[-1]] += "<br>" + next_fmt
+                    elif len(last_keys) >= 2:
                         for s_idx, (k, s_start, s_end) in enumerate(last_splits):
                             seg_start = s_start
                             seg_end = last_splits[s_idx+1][1] if s_idx + 1 < len(last_splits) else len(next_p["raw_text"])
@@ -339,9 +406,9 @@ class PdfParser:
                         found_red = True
                     idx += 1
 
-        clean_q_text = clean_math_text(clean_q_text)
+        clean_q_text = safe_clean_math_text(clean_q_text)
         for k in choices:
-            choices[k] = clean_math_text(choices[k])
+            choices[k] = safe_clean_math_text(choices[k])
 
         self.part1_questions.append({
             "id": len(self.part1_questions) + 1,
@@ -350,6 +417,7 @@ class PdfParser:
             "choices": choices,
             "correct": correct_answer,
             "has_red": found_red,
+            "images": images,
             "xml_strings": []
         })
         return idx
@@ -371,7 +439,6 @@ class PdfParser:
                 splits.append((key, 0, len(text)))
             return res, splits
 
-        # Filter matches: within the same paragraph/cell, choice keys must appear in strictly ascending order
         filtered_matches = []
         last_key_ord = -1
         for m in matches:
@@ -416,21 +483,27 @@ class PdfParser:
     def _parse_part2_question(self, paragraphs_data, start_idx) -> int:
         p_data = paragraphs_data[start_idx]
         raw_text = p_data["raw_text"]
+        fmt_text = p_data.get("formatted_text", raw_text)
         q_match = QUESTION_REGEX.search(raw_text)
         q_num = int(q_match.group(2)) if q_match else len(self.part2_questions) + 1
         
-        clean_q_text = re.sub(r"^\s*(Câu|Bài)\s+\d+[\.\:\-\s]+", "", raw_text).strip()
+        clean_q_text = re.sub(r"^\s*(Câu|Bài)\s+\d+[\.\:\-\s]+", "", fmt_text).strip()
         items = {
             "a": {"text": "", "correct": False},
             "b": {"text": "", "correct": False},
             "c": {"text": "", "correct": False},
             "d": {"text": "", "correct": False}
         }
+        images = []
+        if p_data.get("is_image"):
+            images.append({"data": p_data["image_data"], "bytes": p_data["image_bytes"], "ext": p_data["image_ext"]})
+
         last_key = None
         idx = start_idx + 1
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
             next_text = next_p["raw_text"].strip()
+            next_fmt = next_p.get("formatted_text", next_text)
             
             if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
                 PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
@@ -459,31 +532,37 @@ class PdfParser:
                 idx += 1
             else:
                 if last_key is None:
-                    clean_q_text += "<br>" + next_text
+                    clean_q_text += "<br>" + next_fmt
+                    if next_p.get("is_image"):
+                        images.append({"data": next_p["image_data"], "bytes": next_p["image_bytes"], "ext": next_p["image_ext"]})
                     idx += 1
                 else:
-                    is_true_cont = next_p["has_red"]
-                    if re.search(r"(\[|\()(Đ|·|D|đ)úng(\]|\))", next_text, re.IGNORECASE):
-                        items[last_key]["correct"] = True
-                    elif re.search(r"(\[|\()Sai(\]|\))", next_text, re.IGNORECASE):
-                        items[last_key]["correct"] = False
-                    elif is_true_cont:
-                        items[last_key]["correct"] = True
-                    
-                    clean_cont = re.sub(r"(\[|\()(Đ|·|D|đ)úng(\]|\))|(\[|\()Sai(\]|\))", "", next_text, flags=re.IGNORECASE).strip()
-                    if clean_cont:
-                        items[last_key]["text"] = (items[last_key]["text"] + " " + clean_cont).strip()
+                    if next_p.get("is_image"):
+                        items[last_key]["text"] += "<br>" + next_fmt
+                    else:
+                        is_true_cont = next_p["has_red"]
+                        if re.search(r"(\[|\()(Đ|·|D|đ)úng(\]|\))", next_text, re.IGNORECASE):
+                            items[last_key]["correct"] = True
+                        elif re.search(r"(\[|\()Sai(\]|\))", next_text, re.IGNORECASE):
+                            items[last_key]["correct"] = False
+                        elif is_true_cont:
+                            items[last_key]["correct"] = True
+                        
+                        clean_cont = re.sub(r"(\[|\()(Đ|·|D|đ)úng(\]|\))|(\[|\()Sai(\]|\))", "", next_text, flags=re.IGNORECASE).strip()
+                        if clean_cont:
+                            items[last_key]["text"] = (items[last_key]["text"] + " " + clean_cont).strip()
                     idx += 1
 
-        clean_q_text = clean_math_text(clean_q_text)
+        clean_q_text = safe_clean_math_text(clean_q_text)
         for k in items:
-            items[k]["text"] = clean_math_text(items[k]["text"])
+            items[k]["text"] = safe_clean_math_text(items[k]["text"])
 
         self.part2_questions.append({
             "id": len(self.part2_questions) + 1,
             "original_num": q_num,
             "question": clean_q_text,
             "items": items,
+            "images": images,
             "xml_strings": []
         })
         return idx
@@ -492,49 +571,56 @@ class PdfParser:
     def _parse_part3_question(self, paragraphs_data, start_idx) -> int:
         p_data = paragraphs_data[start_idx]
         raw_text = p_data["raw_text"]
+        fmt_text = p_data.get("formatted_text", raw_text)
         q_match = QUESTION_REGEX.search(raw_text)
         q_num = int(q_match.group(2)) if q_match else len(self.part3_questions) + 1
         
-        lines = [raw_text]
+        q_parts = [fmt_text]
+        images = []
+        if p_data.get("is_image"):
+            images.append({"data": p_data["image_data"], "bytes": p_data["image_bytes"], "ext": p_data["image_ext"]})
+
         idx = start_idx + 1
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
             next_text = next_p["raw_text"].strip()
+            next_fmt = next_p.get("formatted_text", next_text)
             if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
                 PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
                 PART4_REGEX.search(next_text) or
                 STOP_MARKER_REGEX.search(next_text)):
                 break
-            lines.append(next_text)
+            q_parts.append(next_fmt)
+            if next_p.get("is_image"):
+                images.append({"data": next_p["image_data"], "bytes": next_p["image_bytes"], "ext": next_p["image_ext"]})
             idx += 1
 
-        full_text = smart_join_lines(lines)
-        clean_q = full_text
-        answer = ""
+        full_html = "<br>".join(q_parts)
+        full_html = re.sub(r"^\s*(Câu|Bài)\s+\d+[\.\:\-\s]+", "", full_html).strip()
+        
         ans_pattern = (
             r"(?:"
-            r"(?:<br>|\n|^|\s{2,}|\b)(?:[^\s]*áp\s*án|Đáp\s*án)\s*[:=]?\s*([^\n\r]+)|"
-            r"(?:<br>|\n|^|\s{2,}|\b)(?:Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]\s*([^\n\r]+)|"
-            r"(?:<br>|\n|^)\s*(?:Kết\s*quả|KQ)\s*[:=]\s*([^\n\r?]+)"
+            r"(?:<br>|\n|^|\s{2,}|\b)(?:[^\s]*áp\s*án|Đáp\s*án)\s*[:=]?\s*([^\n\r<]+)|"
+            r"(?:<br>|\n|^|\s{2,}|\b)(?:Đ\/[aA]|ĐA|Trả\s*lời)\s*[:=]\s*([^\n\r<]+)|"
+            r"(?:<br>|\n|^)\s*(?:Kết\s*quả|KQ)\s*[:=]\s*([^\n\r?<]+)"
             r")"
         )
-        ans_match = re.search(ans_pattern, full_text, re.IGNORECASE)
-        if ans_match:
-            cand_ans = (ans_match.group(1) or ans_match.group(2) or ans_match.group(3) or "").strip()
-            if cand_ans and not any(k in cand_ans.upper() for k in ["CÂU ", "PHẦN ", "BÀI "]):
-                answer = cand_ans
-            clean_q = (full_text[:ans_match.start()] + full_text[ans_match.end():]).strip()
+        answer = ""
+        m_ans = re.search(ans_pattern, full_html, re.IGNORECASE)
+        if m_ans:
+            answer = (m_ans.group(1) or m_ans.group(2) or m_ans.group(3) or "").strip()
+            clean_q = full_html[:m_ans.start()].strip()
             clean_q = re.sub(r"(<br>|\n)+$", "", clean_q).strip()
         else:
+            clean_q = full_html
             if p_data["has_red"]:
                 for sp in p_data["spans"]:
                     if sp["is_red"] and sp["text"].strip():
                         answer = sp["text"].strip()
                         break
 
-        clean_q = re.sub(r"^\s*(C[^\s]*u|B[^\s]*i)\s+\d+[\.\:\-\s]+", "", clean_q).strip()
-        clean_q = clean_math_text(clean_q)
-        answer = clean_math_text(answer)
+        clean_q = safe_clean_math_text(clean_q)
+        answer = safe_clean_math_text(answer)
         if re.search(r"(\\[a-zA-Z]+|[\^_])", answer) and not (answer.startswith("$") and answer.endswith("$")):
             answer = f"${answer.strip()}$"
 
@@ -543,6 +629,7 @@ class PdfParser:
             "original_num": q_num,
             "question": clean_q,
             "answer": answer,
+            "images": images,
             "xml_strings": []
         })
         return idx
@@ -551,41 +638,49 @@ class PdfParser:
     def _parse_part4_question(self, paragraphs_data, start_idx) -> int:
         p_data = paragraphs_data[start_idx]
         raw_text = p_data["raw_text"]
+        fmt_text = p_data.get("formatted_text", raw_text)
         q_match = QUESTION_REGEX.search(raw_text)
         q_num = int(q_match.group(2)) if q_match else len(self.part4_questions) + 1
         
-        lines = [raw_text]
+        q_parts = [fmt_text]
+        images = []
+        if p_data.get("is_image"):
+            images.append({"data": p_data["image_data"], "bytes": p_data["image_bytes"], "ext": p_data["image_ext"]})
+
         idx = start_idx + 1
         while idx < len(paragraphs_data):
             next_p = paragraphs_data[idx]
             next_text = next_p["raw_text"].strip()
+            next_fmt = next_p.get("formatted_text", next_text)
             if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
                 PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
                 PART4_REGEX.search(next_text) or
                 STOP_MARKER_REGEX.search(next_text)):
                 break
-            lines.append(next_text)
+            q_parts.append(next_fmt)
+            if next_p.get("is_image"):
+                images.append({"data": next_p["image_data"], "bytes": next_p["image_bytes"], "ext": next_p["image_ext"]})
             idx += 1
 
-        full_text = smart_join_lines(lines)
-
-        parts = re.split(r"((?:^|\n|\s{2,}|\b)(?:H[^\s]*ng\s*d[^\s]*n\s*ch[^\s]*m|HD\s*ch[^\s]*m|Lời\s*giải|[^\s]*áp\s*án)[\:\s]*)", full_text, flags=re.IGNORECASE)
+        full_html = "<br>".join(q_parts)
+        parts = re.split(r"((?:^|\n|<br>|\s{2,}|\b)(?:H[^\s]*ng\s*d[^\s]*n\s*ch[^\s]*m|HD\s*ch[^\s]*m|Lời\s*giải|[^\s]*áp\s*án)[\:\s]*)", full_html, flags=re.IGNORECASE)
         if len(parts) >= 3:
             q_part = parts[0].strip()
             guide_part = "".join(parts[1:]).strip()
         else:
-            q_part = full_text
+            q_part = full_html
             guide_part = ""
 
         clean_q = re.sub(r"^\s*(C[^\s]*u|B[^\s]*i)\s+\d+(\s*\([^\)]+\))?[\.\:\-\s]+", "", q_part).strip()
-        clean_q = clean_math_text(clean_q)
-        guide_part = clean_math_text(guide_part)
+        clean_q = safe_clean_math_text(clean_q)
+        guide_part = safe_clean_math_text(guide_part)
 
         self.part4_questions.append({
             "id": len(self.part4_questions) + 1,
             "original_num": q_num,
             "question": clean_q,
             "guide": guide_part,
+            "images": images,
             "xml_strings": []
         })
         return idx

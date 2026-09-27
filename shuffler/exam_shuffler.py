@@ -100,6 +100,7 @@ class ExamShuffler:
                 "choices": new_choices,
                 "choice_xmls": new_choice_xmls,
                 "correct": new_correct,
+                "images": deepcopy(q.get("images", [])),
                 "xml_strings": q.get("xml_strings", [])
             })
 
@@ -127,6 +128,7 @@ class ExamShuffler:
                 "original_num": q.get("original_num", new_idx),
                 "question": q.get("question", ""),
                 "items": new_items,
+                "images": deepcopy(q.get("images", [])),
                 "xml_strings": q.get("xml_strings", [])
             })
 
@@ -142,6 +144,7 @@ class ExamShuffler:
                 "original_num": q.get("original_num", new_idx),
                 "question": q.get("question", ""),
                 "answer": q.get("answer", ""),
+                "images": deepcopy(q.get("images", [])),
                 "xml_strings": q.get("xml_strings", [])
             })
 
@@ -157,6 +160,7 @@ class ExamShuffler:
                 "original_num": q.get("original_num", new_idx),
                 "question": q.get("question", ""),
                 "guide": q.get("guide", ""),
+                "images": deepcopy(q.get("images", [])),
                 "xml_strings": q.get("xml_strings", [])
             })
 

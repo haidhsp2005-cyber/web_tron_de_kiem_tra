@@ -418,7 +418,7 @@ function renderMathSafe(target = document.body) {
                     {left: '\\(', right: '\\)', display: false},
                     {left: '\\[', right: '\\]', display: true}
                 ],
-                ignoredClasses: ["p3-ans-text"],
+                ignoredClasses: ["p3-ans-text", "exam-figure", "exam-table", "exam-image-wrap", "exam-table-wrap"],
                 throwOnError: false
             });
         } catch (e) {
@@ -788,6 +788,13 @@ function formatMathPreview(html) {
     if (!html) return "";
     let s = String(html);
 
+    // Mask image and table blocks to prevent regex from corrupting base64 or HTML tags
+    const placeholders = [];
+    s = s.replace(/(<div class="exam-[^"]*"[\s\S]*?<\/div>|<img\s+[^>]*>|<table[\s\S]*?<\/table>)/gi, (m) => {
+        placeholders.push(m);
+        return `___HTML_BLOCK_${placeholders.length - 1}___`;
+    });
+
     // 0. Unescape double backslashes before LaTeX keywords and braces
     s = s.replace(/\\\\([a-zA-Z{}])/g, "\\$1");
 
@@ -826,6 +833,11 @@ function formatMathPreview(html) {
     s = s.replace(/\u00ad/g, "-");
     s = s.replace(/\u2212/g, "-");
     s = s.replace(/\u037e/g, ";");
+
+    // Restore masked image and table blocks
+    placeholders.forEach((ph, i) => {
+        s = s.replace(`___HTML_BLOCK_${i}___`, ph);
+    });
 
     return s;
 }
