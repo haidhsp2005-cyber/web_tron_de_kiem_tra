@@ -38,10 +38,13 @@ for d in [UPLOAD_DIR, EXPORT_DIR, SAMPLE_DIR, STATIC_DIR]:
 # Ensure sample files exist
 SAMPLE_DOCX = os.path.join(SAMPLE_DIR, "de_thi_mau_chuan.docx")
 SAMPLE_PDF = os.path.join(SAMPLE_DIR, "de_thi_mau_chuan.pdf")
-if not os.path.exists(SAMPLE_DOCX):
-    create_sample_docx(SAMPLE_DOCX)
-if not os.path.exists(SAMPLE_PDF):
-    create_sample_pdf_from_docx(SAMPLE_DOCX, SAMPLE_PDF)
+try:
+    if not os.path.exists(SAMPLE_DOCX):
+        create_sample_docx(SAMPLE_DOCX)
+    if not os.path.exists(SAMPLE_PDF):
+        create_sample_pdf_from_docx(SAMPLE_DOCX, SAMPLE_PDF)
+except Exception as e:
+    print(f"Warning: Could not initialize sample files on startup: {e}")
 
 # In-memory store for sessions
 sessions = {}

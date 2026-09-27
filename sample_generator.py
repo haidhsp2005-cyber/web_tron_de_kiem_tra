@@ -184,14 +184,15 @@ def setup_footer(doc, code: str = "101"):
         p._p.append(fld_numpages)
 
 def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    doc = docx.Document()
-    
-    for section in doc.sections:
-        section.top_margin = Inches(0.70)
-        section.bottom_margin = Inches(0.70)
-        section.left_margin = Inches(0.70)
-        section.right_margin = Inches(0.70)
+    try:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        doc = docx.Document()
+        
+        for section in doc.sections:
+            section.top_margin = Inches(0.70)
+            section.bottom_margin = Inches(0.70)
+            section.left_margin = Inches(0.70)
+            section.right_margin = Inches(0.70)
 
     setup_footer(doc, "101")
         
@@ -671,8 +672,12 @@ def create_sample_docx(output_path="samples/de_thi_mau_chuan.docx"):
     add_run(p4_2_sub, "• Vận tốc v(t) = 10 - t² (m/s). Xe dừng lại khi v(t) = 0 <=> t = √10 (s) (0,5 điểm).\n")
     add_run(p4_2_sub, "• Quãng đường: s = ∫(10 - t²)dt từ 0 đến √10 = (20√10)/3 ≈ 21,08 mét (0,5 điểm).", is_red=True)
 
-    doc.save(output_path)
-    print(f"Standard Math 12 Sample DOCX created at: {output_path}")
+        doc.save(output_path)
+        print(f"Standard Math 12 Sample DOCX created at: {output_path}")
+        return output_path
+    except Exception as e:
+        print(f"Error creating sample docx: {e}")
+        return None
 
 def get_unicode_font_paths():
     """Find available TrueType fonts supporting Vietnamese diacritics across Windows and Linux."""
@@ -703,8 +708,9 @@ def create_sample_pdf_from_docx(docx_path="samples/de_thi_mau_chuan.docx", pdf_p
     Page 2: Answer key table and grading rubric.
     Embeds TrueType fonts (CID Type0) for flawless Vietnamese rendering in all PDF viewers.
     """
-    import pymupdf
-    doc_pdf = pymupdf.open()
+    try:
+        import pymupdf
+        doc_pdf = pymupdf.open()
     
     font_reg_path, font_bold_path = get_unicode_font_paths()
     fn_reg = "F_REG" if font_reg_path else "helv"
@@ -882,9 +888,13 @@ def create_sample_pdf_from_docx(docx_path="samples/de_thi_mau_chuan.docx", pdf_p
     y2 += 12
     page2.insert_text((55, y2), "• s = ∫(10 - t²)dt từ 0 đến √10 = (20√10)/3 ≈ 21,08 mét (0,5 điểm).", fontsize=9, fontname=fn_bold, color=c_red)
 
-    doc_pdf.save(pdf_path)
-    doc_pdf.close()
-    print(f"Standard Math 12 Sample PDF created at: {pdf_path}")
+        doc_pdf.save(pdf_path)
+        doc_pdf.close()
+        print(f"Standard Math 12 Sample PDF created at: {pdf_path}")
+        return pdf_path
+    except Exception as e:
+        print(f"Error creating sample pdf: {e}")
+        return None
 
 if __name__ == "__main__":
     create_sample_docx()
