@@ -418,7 +418,7 @@ function renderMathSafe(target = document.body) {
                     {left: '\\(', right: '\\)', display: false},
                     {left: '\\[', right: '\\]', display: true}
                 ],
-                ignoredClasses: ["p3-ans-text", "exam-figure", "exam-table", "exam-image-wrap", "exam-table-wrap"],
+                ignoredClasses: ["p3-ans-text", "exam-figure", "exam-table", "exam-image-wrap", "exam-table-wrap", "mathtype-formula", "mathtype-badge", "mathtype-placeholder"],
                 throwOnError: false
             });
         } catch (e) {
@@ -788,9 +788,9 @@ function formatMathPreview(html) {
     if (!html) return "";
     let s = String(html);
 
-    // Mask image and table blocks to prevent regex from corrupting base64 or HTML tags
+    // Mask image, table, and MathType badge blocks to prevent regex from corrupting base64 or HTML tags
     const placeholders = [];
-    s = s.replace(/(<div class="exam-[^"]*"[\s\S]*?<\/div>|<img\s+[^>]*>|<table[\s\S]*?<\/table>)/gi, (m) => {
+    s = s.replace(/(<div class="exam-[^"]*"[\s\S]*?<\/div>|<img\s+[^>]*>|<span class="mathtype-[^"]*"[\s\S]*?<\/span>|<table[\s\S]*?<\/table>)/gi, (m) => {
         placeholders.push(m);
         return `___HTML_BLOCK_${placeholders.length - 1}___`;
     });

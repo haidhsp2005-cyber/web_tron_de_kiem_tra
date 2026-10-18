@@ -745,30 +745,53 @@ class DocxExporter:
                     if b64_data:
                         try:
                             img_bytes = base64.b64decode(b64_data)
-                            p_img = doc_or_cell.add_paragraph()
-                            p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                            p_img.paragraph_format.space_before = Pt(4)
-                            p_img.paragraph_format.space_after = Pt(4)
-                            p_img.paragraph_format.line_spacing = 1.0
+                            is_inline = "mathtype-formula" in block or ("exam-figure" not in block and "exam-image-wrap" not in block)
 
-                            max_w = 2.8 if is_cell else 3.8
-                            img_w = Inches(max_w)
-                            try:
-                                from PIL import Image
-                                with Image.open(io.BytesIO(img_bytes)) as pil_img:
-                                    pw, ph = pil_img.size
-                                    w_in = pw / 130.0
-                                    h_in = ph / 130.0
-                                    scale = min(max_w / w_in if w_in > max_w else 1.0, 3.5 / h_in if h_in > 3.5 else 1.0)
-                                    img_w = Inches(w_in * scale)
-                            except Exception:
-                                pass
+                            if is_inline:
+                                if cur_p is None:
+                                    cur_p = doc_or_cell.add_paragraph()
+                                    cur_p.paragraph_format.space_before = Pt(2)
+                                    cur_p.paragraph_format.space_after = Pt(2)
+                                    cur_p.paragraph_format.line_spacing = 1.15
+                                r_img = cur_p.add_run()
+                                try:
+                                    from PIL import Image
+                                    with Image.open(io.BytesIO(img_bytes)) as pil_img:
+                                        pw, ph = pil_img.size
+                                        target_h = min(ph / 96.0, 0.35)
+                                        target_w = (pw / ph) * target_h if ph > 0 else 0.4
+                                        r_img.add_picture(io.BytesIO(img_bytes), width=Inches(target_w), height=Inches(target_h))
+                                except Exception:
+                                    try:
+                                        r_img.add_picture(io.BytesIO(img_bytes), height=Pt(16))
+                                    except Exception:
+                                        pass
+                                # cur_p remains active for inline trailing text
+                            else:
+                                p_img = doc_or_cell.add_paragraph()
+                                p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                p_img.paragraph_format.space_before = Pt(4)
+                                p_img.paragraph_format.space_after = Pt(4)
+                                p_img.paragraph_format.line_spacing = 1.0
 
-                            r_img = p_img.add_run()
-                            r_img.add_picture(io.BytesIO(img_bytes), width=img_w)
+                                max_w = 2.8 if is_cell else 3.8
+                                img_w = Inches(max_w)
+                                try:
+                                    from PIL import Image
+                                    with Image.open(io.BytesIO(img_bytes)) as pil_img:
+                                        pw, ph = pil_img.size
+                                        w_in = pw / 130.0
+                                        h_in = ph / 130.0
+                                        scale = min(max_w / w_in if w_in > max_w else 1.0, 3.5 / h_in if h_in > 3.5 else 1.0)
+                                        img_w = Inches(w_in * scale)
+                                except Exception:
+                                    pass
+
+                                r_img = p_img.add_run()
+                                r_img.add_picture(io.BytesIO(img_bytes), width=img_w)
+                                cur_p = None
                         except Exception as e:
                             pass
-                cur_p = None
 
             elif "<table" in block.lower():
                 rows = re.findall(r'<tr[^>]*>([\s\S]*?)</tr>', block, re.IGNORECASE)

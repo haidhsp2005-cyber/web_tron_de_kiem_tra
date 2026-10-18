@@ -120,6 +120,14 @@ class DocxParser:
     def _extract_image_from_element(self, elem):
         """Extracts embedded image bytes from <w:drawing> or <w:pict> inside an OpenXML element."""
         try:
+            # Check if this element is or contains a MathType OLE object — if so, do NOT treat as a regular block figure
+            for sub in elem.iter():
+                sub_tag = sub.tag.split("}")[-1] if "}" in sub.tag else sub.tag
+                if sub_tag in ["OLEObject", "object"]:
+                    prog_id = sub.get("ProgID", "")
+                    if any(prog_id.startswith(p) for p in ["Equation.3", "MathType"]):
+                        return None
+
             # 1. DrawingML (<w:drawing>)
             for blip in elem.iter(qn("a:blip")):
                 rId = blip.get(qn("r:embed")) or blip.get(qn("r:link"))
@@ -156,6 +164,120 @@ class DocxParser:
                         "formatted_text": f'<div class="exam-image-wrap" style="text-align:center;margin:6px 0;"><img src="{data_uri}" style="max-width:100%;max-height:350px;" class="exam-figure" /></div>',
                         "data": data_uri,
                         "ext": ext
+                    }
+        except Exception:
+            pass
+        return None
+
+    def _convert_metafile_to_png(self, img_bytes: bytes, c_type: str) -> bytes | None:
+        """Convert WMF/EMF metafile bytes to PNG bytes using available backends."""
+        try:
+            # Try wand (ImageMagick) first — best quality
+            from wand.image import Image as WandImage
+            with WandImage(blob=img_bytes) as wimg:
+                wimg.format = "png"
+                wimg.background_color = "white"
+                wimg.alpha_channel = "remove"
+                return wimg.make_blob("png")
+        except Exception:
+            pass
+        try:
+            # Try Pillow
+            from PIL import Image as PilImage
+            import io as _io
+            with PilImage.open(_io.BytesIO(img_bytes)) as pil_img:
+                buf = _io.BytesIO()
+                pil_img.convert("RGBA").save(buf, format="PNG")
+                return buf.getvalue()
+        except Exception:
+            pass
+        return None
+
+    def _extract_mathtype(self, elem):
+        """
+        Extract MathType OLE (Equation.3 / MathType.6) preview image from an element (<w:r> or <w:object>).
+        Returns an inline image info dict or None.
+        """
+        import base64
+        try:
+            is_mathtype = False
+            for sub in elem.iter():
+                sub_tag = sub.tag.split("}")[-1] if "}" in sub.tag else sub.tag
+                if sub_tag == "OLEObject":
+                    prog_id = sub.get("ProgID", "")
+                    if any(prog_id.startswith(p) for p in ["Equation.3", "MathType"]):
+                        is_mathtype = True
+                        break
+            if not is_mathtype:
+                return None
+
+            # Find relationship id (r:id) in v:imagedata
+            r_id = None
+            for img_elem in elem.iter():
+                img_tag = img_elem.tag.split("}")[-1] if "}" in img_elem.tag else img_elem.tag
+                if img_tag == "imagedata":
+                    for attr, val in img_elem.attrib.items():
+                        if attr.endswith("id") and val.startswith("rId"):
+                            r_id = val
+                            break
+                    if r_id:
+                        break
+
+            if not r_id:
+                return {
+                    "formatted_text": '<span class="mathtype-placeholder" style="display:inline-block;border:1px dashed #3b82f6;background:#eff6ff;color:#1e40af;padding:2px 6px;border-radius:4px;font-style:italic;font-size:0.9em;">📐 [Công thức MathType]</span>',
+                    "data": "",
+                    "ext": "placeholder",
+                    "is_mathtype_placeholder": True
+                }
+
+            if hasattr(self.doc, "part") and r_id in self.doc.part.rels:
+                target_part = self.doc.part.rels[r_id].target_part
+                img_bytes = target_part.blob
+                c_type = target_part.content_type.lower()
+                is_metafile = ("wmf" in c_type or "emf" in c_type or
+                               "x-wmf" in c_type or "x-emf" in c_type or
+                               "metafile" in c_type)
+
+                if is_metafile:
+                    png_bytes = self._convert_metafile_to_png(img_bytes, c_type)
+                    if png_bytes:
+                        b64 = base64.b64encode(png_bytes).decode("ascii")
+                        data_uri = f"data:image/png;base64,{b64}"
+                        fmt = f'<img src="{data_uri}" style="max-height:36px;vertical-align:middle;display:inline-block;margin:0 2px;" class="mathtype-formula" />'
+                        return {
+                            "formatted_text": fmt,
+                            "data": data_uri,
+                            "ext": "png",
+                            "is_mathtype": True
+                        }
+                    else:
+                        b64 = base64.b64encode(img_bytes).decode("ascii")
+                        data_uri = f"data:{c_type};base64,{b64}"
+                        fmt = (
+                            f'<span class="mathtype-badge" '
+                            f'style="display:inline-block;border:1px solid #93c5fd;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:4px;font-weight:500;font-size:0.85em;vertical-align:middle;margin:0 2px;" '
+                            f'title="Công thức MathType">'
+                            f'📐 MathType'
+                            f'<img src="{data_uri}" style="display:none;" class="mathtype-formula" />'
+                            f'</span>'
+                        )
+                        return {
+                            "formatted_text": fmt,
+                            "data": data_uri,
+                            "ext": "wmf",
+                            "is_mathtype": True
+                        }
+                else:
+                    ext = "png" if "png" in c_type else ("jpg" if "jpeg" in c_type else "png")
+                    b64 = base64.b64encode(img_bytes).decode("ascii")
+                    data_uri = f"data:{c_type};base64,{b64}"
+                    fmt = f'<img src="{data_uri}" style="max-height:36px;vertical-align:middle;display:inline-block;margin:0 2px;" class="mathtype-formula" />'
+                    return {
+                        "formatted_text": fmt,
+                        "data": data_uri,
+                        "ext": ext,
+                        "is_mathtype": True
                     }
         except Exception:
             pass
@@ -262,7 +384,21 @@ class DocxParser:
             tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
             if tag in ["r", "oMath", "oMathPara"]:
                 heal_omath_element(child)
-                # Check for embedded drawing/image
+
+                # 1. Check for MathType / Equation OLE object inside this run (<w:r><w:object>...)
+                mt_info = self._extract_mathtype(child)
+                if mt_info:
+                    formatted_parts.append(mt_info["formatted_text"])
+                    if mt_info.get("is_mathtype_placeholder"):
+                        raw_parts.append("[CT] ")
+                    else:
+                        raw_parts.append("[Công thức MathType] ")
+                    if mt_info.get("data"):
+                        images.append(mt_info)
+                    oxml_elements.append(child)
+                    continue
+
+                # 2. Check for embedded drawing/image
                 img_info = self._extract_image_from_element(child)
                 if img_info:
                     formatted_parts.append(img_info["formatted_text"])
@@ -277,6 +413,20 @@ class DocxParser:
                 if is_red:
                     has_red = True
                 oxml_elements.append(child)
+
+            elif tag == "object":
+                # MathType / Equation OLE objects if placed directly under paragraph
+                mt_info = self._extract_mathtype(child)
+                if mt_info:
+                    formatted_parts.append(mt_info["formatted_text"])
+                    if mt_info.get("is_mathtype_placeholder"):
+                        raw_parts.append("[CT] ")
+                    else:
+                        raw_parts.append("[Công thức MathType] ")
+                    if mt_info.get("data"):
+                        images.append(mt_info)
+                oxml_elements.append(child)
+
             elif tag in ["br", "cr"]:
                 formatted_parts.append("<br>")
                 raw_parts.append("\n")
