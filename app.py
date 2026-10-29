@@ -1,6 +1,7 @@
 import os
 import shutil
 import uuid
+import tempfile
 from typing import Optional
 from fastapi import FastAPI, File, UploadFile, HTTPException, Body
 from fastapi.responses import FileResponse, JSONResponse
@@ -27,24 +28,39 @@ app.add_middleware(
 
 # Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-EXPORT_DIR = os.path.join(BASE_DIR, "exports")
-SAMPLE_DIR = os.path.join(BASE_DIR, "samples")
-STATIC_DIR = os.path.join(BASE_DIR, "static")
+IS_VERCEL = bool(os.environ.get("VERCEL"))
 
-for d in [UPLOAD_DIR, EXPORT_DIR, SAMPLE_DIR, STATIC_DIR]:
+if IS_VERCEL:
+    TEMP_DIR = tempfile.gettempdir()
+    UPLOAD_DIR = os.path.join(TEMP_DIR, "uploads")
+    EXPORT_DIR = os.path.join(TEMP_DIR, "exports")
+    SAMPLE_DIR = os.path.join(BASE_DIR, "samples")
+    STATIC_DIR = os.path.join(BASE_DIR, "static")
+else:
+    UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+    EXPORT_DIR = os.path.join(BASE_DIR, "exports")
+    SAMPLE_DIR = os.path.join(BASE_DIR, "samples")
+    STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+# Create writable runtime directories
+for d in [UPLOAD_DIR, EXPORT_DIR]:
     os.makedirs(d, exist_ok=True)
+if not IS_VERCEL:
+    for d in [SAMPLE_DIR, STATIC_DIR]:
+        os.makedirs(d, exist_ok=True)
 
 # Ensure sample files exist
 SAMPLE_DOCX = os.path.join(SAMPLE_DIR, "de_thi_mau_chuan.docx")
 SAMPLE_PDF = os.path.join(SAMPLE_DIR, "de_thi_mau_chuan.pdf")
-try:
-    if not os.path.exists(SAMPLE_DOCX):
-        create_sample_docx(SAMPLE_DOCX)
-    if not os.path.exists(SAMPLE_PDF):
-        create_sample_pdf_from_docx(SAMPLE_DOCX, SAMPLE_PDF)
-except Exception as e:
-    print(f"Warning: Could not initialize sample files on startup: {e}")
+
+if not IS_VERCEL:
+    try:
+        if not os.path.exists(SAMPLE_DOCX):
+            create_sample_docx(SAMPLE_DOCX)
+        if not os.path.exists(SAMPLE_PDF):
+            create_sample_pdf_from_docx(SAMPLE_DOCX, SAMPLE_PDF)
+    except Exception as e:
+        print(f"Warning: Could not initialize sample files on startup: {e}")
 
 # In-memory store for sessions
 sessions = {}
@@ -55,20 +71,29 @@ def health():
 
 @app.get("/api/download-sample-docx")
 def download_sample_docx():
-    if not os.path.exists(SAMPLE_DOCX):
-        create_sample_docx(SAMPLE_DOCX)
+    target = SAMPLE_DOCX
+    if not os.path.exists(target):
+        target = os.path.join(UPLOAD_DIR, "de_thi_mau_chuan.docx")
+        if not os.path.exists(target):
+            create_sample_docx(target)
     return FileResponse(
-        SAMPLE_DOCX,
+        target,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename="de_thi_mau_toan_in_dam_dap_an_do.docx"
     )
 
 @app.get("/api/download-sample-pdf")
 def download_sample_pdf():
-    if not os.path.exists(SAMPLE_PDF):
-        create_sample_pdf_from_docx(SAMPLE_DOCX, SAMPLE_PDF)
+    target = SAMPLE_PDF
+    if not os.path.exists(target):
+        target = os.path.join(UPLOAD_DIR, "de_thi_mau_chuan.pdf")
+        if not os.path.exists(target):
+            docx_src = SAMPLE_DOCX if os.path.exists(SAMPLE_DOCX) else os.path.join(UPLOAD_DIR, "de_thi_mau_chuan.docx")
+            if not os.path.exists(docx_src):
+                create_sample_docx(docx_src)
+            create_sample_pdf_from_docx(docx_src, target)
     return FileResponse(
-        SAMPLE_PDF,
+        target,
         media_type="application/pdf",
         filename="de_thi_mau_toan_in_dam_dap_an_do.pdf"
     )
@@ -76,11 +101,14 @@ def download_sample_pdf():
 @app.get("/api/load-sample")
 def load_sample():
     """Loads sample exam directly into session for instant testing without uploading."""
-    if not os.path.exists(SAMPLE_DOCX):
-        create_sample_docx(SAMPLE_DOCX)
+    src = SAMPLE_DOCX
+    if not os.path.exists(src):
+        src = os.path.join(UPLOAD_DIR, "de_thi_mau_chuan.docx")
+        if not os.path.exists(src):
+            create_sample_docx(src)
     
     session_id = str(uuid.uuid4())
-    parser = DocxParser(SAMPLE_DOCX)
+    parser = DocxParser(src)
     data = parser.parse()
     
     sessions[session_id] = {
@@ -208,11 +236,21 @@ async def shuffle_exam(payload: dict = Body(...)):
             ]
         }
         
+        import base64
+        zip_b64 = ""
+        try:
+            if os.path.exists(zip_path):
+                with open(zip_path, "rb") as zf:
+                    zip_b64 = base64.b64encode(zf.read()).decode("ascii")
+        except Exception:
+            pass
+
         return {
             "run_id": run_id,
             "summary": shuffled_result["summary"],
             "variants_count": len(shuffled_result["variants"]),
-            "downloads": download_links
+            "downloads": download_links,
+            "zip_base64": zip_b64
         }
     except Exception as e:
         import traceback

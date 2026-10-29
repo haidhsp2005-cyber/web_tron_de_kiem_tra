@@ -662,7 +662,34 @@ function renderResults(data) {
     const codes = summary.codes || [];
 
     // Download Links
-    document.getElementById("btn-download-zip").href = downloads.zip;
+    const zipBtn = document.getElementById("btn-download-zip");
+    zipBtn.href = downloads.zip;
+    if (data.zip_base64) {
+        zipBtn.onclick = (e) => {
+            try {
+                const byteCharacters = atob(data.zip_base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: "application/zip" });
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = blobUrl;
+                a.download = "Bo_de_thi_tron.zip";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+                e.preventDefault();
+            } catch (err) {
+                console.warn("Client blob download error:", err);
+            }
+        };
+    } else {
+        zipBtn.onclick = null;
+    }
     document.getElementById("btn-download-excel").href = downloads.excel;
     document.getElementById("btn-download-summary-docx").href = downloads.summary_docx;
 
