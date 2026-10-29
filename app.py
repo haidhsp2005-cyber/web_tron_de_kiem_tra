@@ -2,19 +2,12 @@ import os
 import shutil
 import uuid
 import tempfile
+import base64
 from typing import Optional
 from fastapi import FastAPI, File, UploadFile, HTTPException, Body
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-
-from parser.docx_parser import DocxParser
-from parser.pdf_parser import PdfParser
-from shuffler.exam_shuffler import ExamShuffler
-from exporter.docx_exporter import DocxExporter
-from exporter.excel_exporter import ExcelExporter
-from exporter.zip_exporter import ZipExporter
-from sample_generator import create_sample_docx, create_sample_pdf_from_docx
 
 app = FastAPI(title="Website Trộn Đề Thi Chuẩn Bộ GD&ĐT", version="2.0.0")
 
@@ -55,8 +48,10 @@ SAMPLE_PDF = os.path.join(SAMPLE_DIR, "de_thi_mau_chuan.pdf")
 if not IS_VERCEL:
     try:
         if not os.path.exists(SAMPLE_DOCX):
+            from sample_generator import create_sample_docx
             create_sample_docx(SAMPLE_DOCX)
         if not os.path.exists(SAMPLE_PDF):
+            from sample_generator import create_sample_pdf_from_docx
             create_sample_pdf_from_docx(SAMPLE_DOCX, SAMPLE_PDF)
     except Exception as e:
         print(f"Warning: Could not initialize sample files on startup: {e}")
@@ -74,6 +69,7 @@ def download_sample_docx():
     if not os.path.exists(target):
         target = os.path.join(UPLOAD_DIR, "de_thi_mau_chuan.docx")
         if not os.path.exists(target):
+            from sample_generator import create_sample_docx
             create_sample_docx(target)
     return FileResponse(
         target,
@@ -87,6 +83,7 @@ def download_sample_pdf():
     if not os.path.exists(target):
         target = os.path.join(UPLOAD_DIR, "de_thi_mau_chuan.pdf")
         if not os.path.exists(target):
+            from sample_generator import create_sample_docx, create_sample_pdf_from_docx
             docx_src = SAMPLE_DOCX if os.path.exists(SAMPLE_DOCX) else os.path.join(UPLOAD_DIR, "de_thi_mau_chuan.docx")
             if not os.path.exists(docx_src):
                 create_sample_docx(docx_src)
@@ -104,8 +101,10 @@ def load_sample():
     if not os.path.exists(src):
         src = os.path.join(UPLOAD_DIR, "de_thi_mau_chuan.docx")
         if not os.path.exists(src):
+            from sample_generator import create_sample_docx
             create_sample_docx(src)
     
+    from parser.docx_parser import DocxParser
     session_id = str(uuid.uuid4())
     parser = DocxParser(src)
     data = parser.parse()
@@ -137,9 +136,11 @@ async def upload_exam(file: UploadFile = File(...)):
         
     try:
         if ext == ".docx":
+            from parser.docx_parser import DocxParser
             parser = DocxParser(saved_path)
             data = parser.parse()
         else:
+            from parser.pdf_parser import PdfParser
             parser = PdfParser(saved_path)
             data = parser.parse()
             
@@ -189,6 +190,11 @@ async def shuffle_exam(payload: dict = Body(...)):
         raise HTTPException(status_code=400, detail="Không tìm thấy dữ liệu đề thi. Vui lòng tải đề lên trước.")
 
     try:
+        from shuffler.exam_shuffler import ExamShuffler
+        from exporter.docx_exporter import DocxExporter
+        from exporter.excel_exporter import ExcelExporter
+        from exporter.zip_exporter import ZipExporter
+
         shuffler = ExamShuffler(exam_data, config)
         shuffled_result = shuffler.shuffle()
         
