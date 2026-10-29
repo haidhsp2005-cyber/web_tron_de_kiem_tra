@@ -29,18 +29,17 @@ app.add_middleware(
 # Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IS_VERCEL = bool(os.environ.get("VERCEL"))
+STATIC_DIR = os.path.join(BASE_DIR, "public") if os.path.exists(os.path.join(BASE_DIR, "public")) else os.path.join(BASE_DIR, "static")
 
 if IS_VERCEL:
     TEMP_DIR = tempfile.gettempdir()
     UPLOAD_DIR = os.path.join(TEMP_DIR, "uploads")
     EXPORT_DIR = os.path.join(TEMP_DIR, "exports")
     SAMPLE_DIR = os.path.join(BASE_DIR, "samples")
-    STATIC_DIR = os.path.join(BASE_DIR, "static")
 else:
     UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
     EXPORT_DIR = os.path.join(BASE_DIR, "exports")
     SAMPLE_DIR = os.path.join(BASE_DIR, "samples")
-    STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 # Create writable runtime directories
 for d in [UPLOAD_DIR, EXPORT_DIR]:
@@ -264,6 +263,14 @@ def download_file(run_id: str, filename: str):
         raise HTTPException(status_code=404, detail="File không tồn tại hoặc đã hết hạn")
         
     return FileResponse(file_path, filename=filename)
+
+@app.get("/")
+@app.get("")
+def serve_root():
+    idx_file = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(idx_file):
+        return FileResponse(idx_file)
+    return {"status": "ok", "message": "Website Trộn Đề Thi đang hoạt động"}
 
 # Mount static files
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
