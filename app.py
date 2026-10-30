@@ -4,12 +4,12 @@ import uuid
 import tempfile
 import base64
 from typing import Optional
-from fastapi import FastAPI, File, UploadFile, HTTPException, Body
+from fastapi import FastAPI, APIRouter, File, UploadFile, HTTPException, Body, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Website Trộn Đề Thi Chuẩn Bộ GD&ĐT", version="2.0.0")
+app = FastAPI(title="Website Trộn Đề Thi Chuẩn Bộ GD&ĐT", version="2.0.0", redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,6 +18,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Normalize paths from Vercel rewrites or proxies
+@app.middleware("http")
+async def normalize_api_path(request: Request, call_next):
+    path = request.scope.get("path", "")
+    if path.startswith("/api/index.py"):
+        request.scope["path"] = path[len("/api/index.py"):] or "/"
+    elif path.startswith("/index.py"):
+        request.scope["path"] = path[len("/index.py"):] or "/"
+    return await call_next(request)
 
 # Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -59,11 +69,14 @@ if not IS_VERCEL:
 # In-memory store for sessions
 sessions = {}
 
-@app.get("/api/health")
+# APIRouter for all backend API endpoints
+api_router = APIRouter()
+
+@api_router.get("/health")
 def health():
     return {"status": "ok", "message": "Server đang hoạt động bình thường"}
 
-@app.get("/api/download-sample-docx")
+@api_router.get("/download-sample-docx")
 def download_sample_docx():
     target = SAMPLE_DOCX
     if not os.path.exists(target):
@@ -77,7 +90,7 @@ def download_sample_docx():
         filename="de_thi_mau_toan_in_dam_dap_an_do.docx"
     )
 
-@app.get("/api/download-sample-pdf")
+@api_router.get("/download-sample-pdf")
 def download_sample_pdf():
     target = SAMPLE_PDF
     if not os.path.exists(target):
@@ -94,7 +107,7 @@ def download_sample_pdf():
         filename="de_thi_mau_toan_in_dam_dap_an_do.pdf"
     )
 
-@app.get("/api/load-sample")
+@api_router.get("/load-sample")
 def load_sample():
     """Loads sample exam directly into session for instant testing without uploading."""
     src = SAMPLE_DOCX
@@ -119,7 +132,7 @@ def load_sample():
         "exam_data": data
     }
 
-@app.post("/api/upload")
+@api_router.post("/upload")
 async def upload_exam(file: UploadFile = File(...)):
     filename = file.filename or "exam"
     ext = os.path.splitext(filename)[1].lower()
@@ -158,14 +171,13 @@ async def upload_exam(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi đọc file: {str(e)}")
 
-@app.post("/api/save-exam")
+@api_router.post("/save-exam")
 async def save_exam(payload: dict = Body(...)):
     """Saves user modifications to the exam questions and answers."""
     session_id = payload.get("session_id")
     exam_data = payload.get("exam_data")
     
     if not session_id or session_id not in sessions:
-        # If new session, initialize it
         if not session_id:
             session_id = str(uuid.uuid4())
         sessions[session_id] = {}
@@ -173,7 +185,7 @@ async def save_exam(payload: dict = Body(...)):
     sessions[session_id]["exam_data"] = exam_data
     return {"status": "success", "session_id": session_id, "message": "Đã lưu thay đổi đề thi thành công!"}
 
-@app.post("/api/shuffle")
+@api_router.post("/shuffle")
 async def shuffle_exam(payload: dict = Body(...)):
     """
     Shuffles exam according to config and generates export files.
@@ -241,7 +253,6 @@ async def shuffle_exam(payload: dict = Body(...)):
             ]
         }
         
-        import base64
         zip_b64 = ""
         try:
             if os.path.exists(zip_path):
@@ -262,7 +273,7 @@ async def shuffle_exam(payload: dict = Body(...)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Lỗi trong quá trình trộn đề: {str(e)}")
 
-@app.get("/api/download/{run_id}/{filename}")
+@api_router.get("/download/{run_id}/{filename}")
 def download_file(run_id: str, filename: str):
     file_path = os.path.join(EXPORT_DIR, run_id, filename)
     if not os.path.exists(file_path):
@@ -270,8 +281,12 @@ def download_file(run_id: str, filename: str):
         
     return FileResponse(file_path, filename=filename)
 
+# Mount API router with both "/api" and root prefix ""
+# This guarantees route matching whether Vercel keeps "/api" or strips it!
+app.include_router(api_router, prefix="/api")
+app.include_router(api_router)
+
 @app.get("/")
-@app.get("")
 def serve_root():
     idx_file = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(idx_file):
@@ -279,7 +294,8 @@ def serve_root():
     return {"status": "ok", "message": "Website Trộn Đề Thi đang hoạt động"}
 
 # Mount static files
-app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+if os.path.exists(STATIC_DIR):
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
