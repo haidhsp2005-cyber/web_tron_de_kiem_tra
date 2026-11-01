@@ -84,7 +84,7 @@ class DocxExporter:
             
             # 2. Detailed answer paper
             key_path = os.path.join(self.output_dir, f"Dap_an_chi_tiet_{code}.docx")
-            self._generate_exam_docx(variant, key_path, is_answer_key=True)
+            self._generate_detailed_key_docx(variant, key_path)
             key_files.append(key_path)
 
         # 3. Summary answers DOCX
@@ -978,5 +978,436 @@ class DocxExporter:
                     for r in row_cells[c_idx].paragraphs[0].runs:
                         r.bold = True
                     format_cell(row_cells[c_idx], bg_hex=bg, bold=True)
+
+        # ----------------- PHẦN IV TABLE -----------------
+        p4_rows = self.summary.get("part4", {}).get("rows", [])
+        if p4_rows:
+            p_p4 = doc.add_paragraph()
+            p_p4.paragraph_format.space_before = Pt(14)
+            p_p4.paragraph_format.space_after = Pt(4)
+            r = p_p4.add_run("IV. ĐÁP ÁN & HƯỚNG DẪN CHẤM PHẦN IV (TỰ LUẬN)")
+            r.bold = True
+            r.font.size = Pt(12.5)
+
+            tbl4 = doc.add_table(rows=1 + len(p4_rows), cols=1 + len(codes))
+            tbl4.alignment = WD_TABLE_ALIGNMENT.CENTER
+            tbl4.style = 'Table Grid'
+
+            hdr4 = tbl4.rows[0]
+            hdr4.cells[0].paragraphs[0].add_run("Câu")
+            format_cell(hdr4.cells[0], bg_hex="6D28D9", bold=True)
+            hdr4.cells[0].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
+            
+            for i, c in enumerate(codes, start=1):
+                hdr4.cells[i].paragraphs[0].add_run(f"Mã {c}")
+                format_cell(hdr4.cells[i], bg_hex="6D28D9", bold=True)
+                hdr4.cells[i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
+
+            for row_idx, r_data in enumerate(p4_rows, start=1):
+                row_cells = tbl4.rows[row_idx].cells
+                bg = "F5F3FF" if row_idx % 2 == 0 else "FFFFFF"
+                row_cells[0].paragraphs[0].add_run(f"Câu {r_data['question_num']}")
+                format_cell(row_cells[0], bg_hex=bg, bold=True)
+                
+                for c_idx, c in enumerate(codes, start=1):
+                    val = r_data.get(c, "")
+                    guide_text = ""
+                    if isinstance(val, dict):
+                        guide_text = val.get("guide") or val.get("question") or ""
+                    else:
+                        guide_text = str(val or "")
+                    
+                    self._insert_formatted_text(row_cells[c_idx].paragraphs[0], guide_text)
+                    format_cell(row_cells[c_idx], bg_hex=bg, bold=False, align=WD_ALIGN_PARAGRAPH.LEFT)
+
+        doc.save(file_path)
+
+    def _generate_detailed_key_docx(self, variant: dict, file_path: str):
+        """
+        Generates official answer key & detailed solution document (Dap_an_chi_tiet_{code}.docx)
+        matching the official Ministry format requested by the teacher:
+        1. BẢNG ĐÁP ÁN VÀ MA TRẬN ĐÁP ÁN (Phần I, Phần II, Phần III, Phần IV)
+        2. HƯỚNG DẪN GIẢI CHI TIẾT (Phần I, Phần II, Phần III, Phần IV)
+        """
+        doc = docx.Document()
+        for sec in doc.sections:
+            sec.top_margin = Inches(0.70)
+            sec.bottom_margin = Inches(0.70)
+            sec.left_margin = Inches(0.70)
+            sec.right_margin = Inches(0.70)
+
+        code = variant["code"]
+        self._setup_footer(doc, code, title_prefix="ĐÁP ÁN & LỜI GIẢI CHI TIẾT")
+
+        school_raw = self.metadata.get("school", "TRƯỜNG THPT LONG CANG")
+        agency, school = self._parse_agency_and_school(school_raw)
+        subject = self.metadata.get("subject", "TIN HỌC")
+        year = self.metadata.get("year", "2026 - 2027")
+        time_str = self.metadata.get("time", "45 phút")
+
+        # Top Header Box
+        tbl = doc.add_table(rows=1, cols=2)
+        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tbl.autofit = False
+        set_table_no_borders(tbl)
+
+        c0 = tbl.cell(0, 0)
+        c0.width = Inches(3.2)
+        p0 = c0.paragraphs[0]
+        p0.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p0.paragraph_format.space_before = Pt(0)
+        p0.paragraph_format.space_after = Pt(1)
+        p0.paragraph_format.line_spacing = 1.15
+        
+        r0 = p0.add_run(f"{agency.upper()}\n{school.upper()}\n")
+        r0.font.name = "Times New Roman"
+        r0.font.size = Pt(10.5)
+        r0.bold = True
+        
+        r_yr = p0.add_run(f"NĂM HỌC {year}")
+        r_yr.font.name = "Times New Roman"
+        r_yr.font.size = Pt(10)
+        r_yr.bold = True
+
+        c1 = tbl.cell(0, 1)
+        c1.width = Inches(3.6)
+        p1 = c1.paragraphs[0]
+        p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p1.paragraph_format.space_before = Pt(0)
+        p1.paragraph_format.space_after = Pt(1)
+        p1.paragraph_format.line_spacing = 1.15
+        
+        r_tit = p1.add_run("BẢNG ĐÁP ÁN VÀ MA TRẬN ĐÁP ÁN\n")
+        r_tit.font.name = "Times New Roman"
+        r_tit.font.size = Pt(11)
+        r_tit.bold = True
+        r_tit.font.color.rgb = BLUE_COLOR
+            
+        r_sub = p1.add_run(f"MÔN: {subject.upper()}\n")
+        r_sub.font.name = "Times New Roman"
+        r_sub.font.size = Pt(12)
+        r_sub.bold = True
+        
+        r_time = p1.add_run(f"Thời gian làm bài: {time_str} (không kể thời gian phát đề)\n")
+        r_time.font.name = "Times New Roman"
+        r_time.font.size = Pt(10)
+        r_time.italic = True
+
+        r_code = p1.add_run(f"MÃ ĐỀ THI: {code}")
+        r_code.font.name = "Times New Roman"
+        r_code.font.size = Pt(12)
+        r_code.bold = True
+        r_code.font.color.rgb = RED_COLOR
+
+        # Divider line
+        p_div = doc.add_paragraph()
+        p_div.paragraph_format.space_before = Pt(4)
+        p_div.paragraph_format.space_after = Pt(6)
+        r_line = p_div.add_run("━" * 55)
+        r_line.font.color.rgb = RGBColor(147, 197, 253)
+
+        # ================= SECTION 1: BẢNG ĐÁP ÁN VÀ MA TRẬN ĐÁP ÁN =================
+        p_sec_title = doc.add_paragraph()
+        p_sec_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_sec_title.paragraph_format.space_before = Pt(6)
+        p_sec_title.paragraph_format.space_after = Pt(2)
+        r_st = p_sec_title.add_run("BẢNG ĐÁP ÁN VÀ MA TRẬN ĐÁP ÁN\n")
+        r_st.bold = True
+        r_st.font.size = Pt(14)
+        r_st.font.color.rgb = BLUE_COLOR
+        
+        r_sub_st = p_sec_title.add_run(f"Môn: {subject} - Lớp: 11 | Mã đề: {code}")
+        r_sub_st.bold = True
+        r_sub_st.font.size = Pt(11)
+
+        # 1. ĐÁP ÁN PHẦN I
+        p1_list = variant.get("part1", [])
+        if p1_list:
+            p1_count = len(p1_list)
+            p1_pts = round(p1_count * 0.25, 2)
+            p1_pts_str = str(int(p1_pts)) if p1_pts == int(p1_pts) else str(p1_pts)
+            
+            p_p1_lbl = doc.add_paragraph()
+            p_p1_lbl.paragraph_format.space_before = Pt(10)
+            p_p1_lbl.paragraph_format.space_after = Pt(3)
+            p_p1_lbl.paragraph_format.keep_with_next = True
+            r = p_p1_lbl.add_run(f"1. ĐÁP ÁN PHẦN I ({p1_pts_str} điểm - Mỗi câu đúng 0,25 điểm)")
+            r.bold = True
+            r.font.size = Pt(11.5)
+            r.font.color.rgb = BLUE_COLOR
+
+            # Horizontal chunks of 10 columns matching user sample
+            chunk_size = 10
+            for c_start in range(0, p1_count, chunk_size):
+                chunk = p1_list[c_start:c_start + chunk_size]
+                cols = 1 + len(chunk)
+                t_p1 = doc.add_table(rows=2, cols=cols)
+                t_p1.alignment = WD_TABLE_ALIGNMENT.CENTER
+                t_p1.style = 'Table Grid'
+                
+                # Row 0: Câu
+                r0 = t_p1.rows[0]
+                r0.cells[0].paragraphs[0].add_run("Câu")
+                format_cell(r0.cells[0], bg_hex="1E40AF", bold=True)
+                r0.cells[0].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
+                for q_i, q in enumerate(chunk, start=1):
+                    r0.cells[q_i].paragraphs[0].add_run(str(q["num"]))
+                    format_cell(r0.cells[q_i], bg_hex="1E40AF", bold=True)
+                    r0.cells[q_i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
+                    
+                # Row 1: Đ/Á
+                r1 = t_p1.rows[1]
+                r1.cells[0].paragraphs[0].add_run("Đ/Á")
+                format_cell(r1.cells[0], bg_hex="F9FAFB", bold=True)
+                for q_i, q in enumerate(chunk, start=1):
+                    ans = q.get("correct", "")
+                    r1.cells[q_i].paragraphs[0].add_run(ans)
+                    format_cell(r1.cells[q_i], bg_hex="FFFFFF", bold=True)
+                    if r1.cells[q_i].paragraphs[0].runs:
+                        r1.cells[q_i].paragraphs[0].runs[0].font.color.rgb = RED_COLOR
+
+                p_sp = doc.add_paragraph()
+                p_sp.paragraph_format.space_before = Pt(0)
+                p_sp.paragraph_format.space_after = Pt(3)
+
+        # 2. ĐÁP ÁN PHẦN II
+        p2_list = variant.get("part2", [])
+        if p2_list:
+            p2_count = len(p2_list)
+            p2_pts_str = str(p2_count)
+            p_p2_lbl = doc.add_paragraph()
+            p_p2_lbl.paragraph_format.space_before = Pt(8)
+            p_p2_lbl.paragraph_format.space_after = Pt(3)
+            p_p2_lbl.paragraph_format.keep_with_next = True
+            r = p_p2_lbl.add_run(f"2. ĐÁP ÁN PHẦN II ({p2_pts_str} điểm - Tối đa 1 đ/câu: 1 ý=0,1đ; 2 ý=0,25đ; 3 ý=0,5đ; 4 ý=1,0đ)")
+            r.bold = True
+            r.font.size = Pt(11.5)
+            r.font.color.rgb = RGBColor(4, 120, 87)
+
+            t_p2 = doc.add_table(rows=1 + p2_count, cols=5)
+            t_p2.alignment = WD_TABLE_ALIGNMENT.CENTER
+            t_p2.style = 'Table Grid'
+            
+            hdr_titles = ["Câu", "Lệnh a)", "Lệnh b)", "Lệnh c)", "Lệnh d)"]
+            for h_i, h_t in enumerate(hdr_titles):
+                t_p2.rows[0].cells[h_i].paragraphs[0].add_run(h_t)
+                format_cell(t_p2.rows[0].cells[h_i], bg_hex="047857", bold=True)
+                t_p2.rows[0].cells[h_i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
+
+            for q_i, q in enumerate(p2_list, start=1):
+                row = t_p2.rows[q_i]
+                bg = "F0FDF4" if q_i % 2 == 0 else "FFFFFF"
+                row.cells[0].paragraphs[0].add_run(f"Câu {q['num']}")
+                format_cell(row.cells[0], bg_hex=bg, bold=True)
+                
+                items = q.get("items", {})
+                for itm_i, k in enumerate(["a", "b", "c", "d"], start=1):
+                    is_true = items.get(k, {}).get("correct", False)
+                    ans_str = "Đ" if is_true else "S"
+                    row.cells[itm_i].paragraphs[0].add_run(ans_str)
+                    format_cell(row.cells[itm_i], bg_hex=bg, bold=True)
+                    if row.cells[itm_i].paragraphs[0].runs:
+                        row.cells[itm_i].paragraphs[0].runs[0].font.color.rgb = RGBColor(4, 120, 87) if is_true else RGBColor(107, 114, 128)
+
+        # 3. ĐÁP ÁN PHẦN III (nếu có)
+        p3_list = variant.get("part3", [])
+        if p3_list:
+            p3_count = len(p3_list)
+            p3_pts = round(p3_count * 0.5, 2)
+            p3_pts_str = str(int(p3_pts)) if p3_pts == int(p3_pts) else str(p3_pts)
+            p_p3_lbl = doc.add_paragraph()
+            p_p3_lbl.paragraph_format.space_before = Pt(8)
+            p_p3_lbl.paragraph_format.space_after = Pt(3)
+            p_p3_lbl.paragraph_format.keep_with_next = True
+            r = p_p3_lbl.add_run(f"3. ĐÁP ÁN PHẦN III ({p3_pts_str} điểm)")
+            r.bold = True
+            r.font.size = Pt(11.5)
+            r.font.color.rgb = RGBColor(180, 83, 9)
+
+            chunk_size = 10
+            for c_start in range(0, p3_count, chunk_size):
+                chunk = p3_list[c_start:c_start + chunk_size]
+                cols = 1 + len(chunk)
+                t_p3 = doc.add_table(rows=2, cols=cols)
+                t_p3.alignment = WD_TABLE_ALIGNMENT.CENTER
+                t_p3.style = 'Table Grid'
+                
+                r0 = t_p3.rows[0]
+                r0.cells[0].paragraphs[0].add_run("Câu")
+                format_cell(r0.cells[0], bg_hex="B45309", bold=True)
+                r0.cells[0].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
+                for q_i, q in enumerate(chunk, start=1):
+                    r0.cells[q_i].paragraphs[0].add_run(str(q["num"]))
+                    format_cell(r0.cells[q_i], bg_hex="B45309", bold=True)
+                    r0.cells[q_i].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
+                    
+                r1 = t_p3.rows[1]
+                r1.cells[0].paragraphs[0].add_run("Đ/Á")
+                format_cell(r1.cells[0], bg_hex="FFFBEB", bold=True)
+                for q_i, q in enumerate(chunk, start=1):
+                    ans = str(q.get("answer", ""))
+                    r1.cells[q_i].paragraphs[0].add_run(ans)
+                    format_cell(r1.cells[q_i], bg_hex="FFFFFF", bold=True)
+                    if r1.cells[q_i].paragraphs[0].runs:
+                        r1.cells[q_i].paragraphs[0].runs[0].font.color.rgb = RED_COLOR
+
+                p_sp = doc.add_paragraph()
+                p_sp.paragraph_format.space_before = Pt(0)
+                p_sp.paragraph_format.space_after = Pt(3)
+
+        # 4. HƯỚNG DẪN CHẤM PHẦN TỰ LUẬN
+        p4_list = variant.get("part4", [])
+        if p4_list:
+            p4_count = len(p4_list)
+            p4_pts_str = str(p4_count)
+            p_p4_lbl = doc.add_paragraph()
+            p_p4_lbl.paragraph_format.space_before = Pt(8)
+            p_p4_lbl.paragraph_format.space_after = Pt(3)
+            p_p4_lbl.paragraph_format.keep_with_next = True
+            r = p_p4_lbl.add_run(f"4. HƯỚNG DẪN CHẤM PHẦN TỰ LUẬN ({p4_pts_str} điểm)")
+            r.bold = True
+            r.font.size = Pt(11.5)
+            r.font.color.rgb = RGBColor(109, 40, 217)
+
+            for q in p4_list:
+                p_q = doc.add_paragraph()
+                p_q.paragraph_format.space_before = Pt(4)
+                p_q.paragraph_format.space_after = Pt(2)
+                p_q.paragraph_format.line_spacing = 1.15
+                score_str = f" ({q.get('score', '1 điểm')}): " if q.get('score') else ": "
+                r_num = p_q.add_run(f"Câu {q['num']}{score_str}")
+                r_num.bold = True
+                
+                guide = q.get("guide") or q.get("question") or ""
+                self._insert_formatted_text(p_q, guide)
+
+        # ================= SECTION 2: HƯỚNG DẪN GIẢI CHI TIẾT =================
+        doc.add_page_break()
+
+        p_sol_title = doc.add_paragraph()
+        p_sol_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_sol_title.paragraph_format.space_before = Pt(10)
+        p_sol_title.paragraph_format.space_after = Pt(2)
+        r_sol = p_sol_title.add_run("HƯỚNG DẪN GIẢI CHI TIẾT\n")
+        r_sol.bold = True
+        r_sol.font.size = Pt(15)
+        r_sol.font.color.rgb = BLUE_COLOR
+        
+        r_sol_sub = p_sol_title.add_run(f"Môn: {subject} - Lớp: 11 | Mã đề: {code}")
+        r_sol_sub.bold = True
+        r_sol_sub.font.size = Pt(11.5)
+
+        # PHẦN I. LỜI GIẢI CÂU TRẮC NGHIỆM NHIỀU LỰA CHỌN
+        if p1_list:
+            p_sol_p1 = doc.add_paragraph()
+            p_sol_p1.paragraph_format.space_before = Pt(14)
+            p_sol_p1.paragraph_format.space_after = Pt(4)
+            p_sol_p1.paragraph_format.keep_with_next = True
+            r = p_sol_p1.add_run(f"PHẦN I. LỜI GIẢI CÂU TRẮC NGHIỆM NHIỀU LỰA CHỌN ({p1_pts_str} điểm)")
+            r.bold = True
+            r.font.size = Pt(12)
+            r.font.color.rgb = BLUE_COLOR
+
+            for q in p1_list:
+                p_q = doc.add_paragraph()
+                p_q.paragraph_format.space_before = Pt(5)
+                p_q.paragraph_format.space_after = Pt(2)
+                p_q.paragraph_format.line_spacing = 1.15
+                r_num = p_q.add_run(f"Câu {q['num']} (Chọn {q['correct']}):\n")
+                r_num.bold = True
+                r_num.font.color.rgb = BLUE_COLOR
+                
+                guide = q.get("guide", "").strip()
+                if not guide:
+                    correct_choice_text = q.get("choices", {}).get(q['correct'], "")
+                    guide = f"{correct_choice_text}. Do đó chọn đáp án {q['correct']}."
+                self._insert_formatted_text(p_q, guide)
+
+        # PHẦN II. LỜI GIẢI CÂU TRẮC NGHIỆM ĐÚNG SAI
+        if p2_list:
+            p_sol_p2 = doc.add_paragraph()
+            p_sol_p2.paragraph_format.space_before = Pt(14)
+            p_sol_p2.paragraph_format.space_after = Pt(4)
+            p_sol_p2.paragraph_format.keep_with_next = True
+            r = p_sol_p2.add_run(f"PHẦN II. LỜI GIẢI CÂU TRẮC NGHIỆM ĐÚNG SAI ({p2_pts_str} điểm)")
+            r.bold = True
+            r.font.size = Pt(12)
+            r.font.color.rgb = RGBColor(4, 120, 87)
+
+            for q in p2_list:
+                p_q = doc.add_paragraph()
+                p_q.paragraph_format.space_before = Pt(6)
+                p_q.paragraph_format.space_after = Pt(2)
+                r_num = p_q.add_run(f"Câu {q['num']}:\n")
+                r_num.bold = True
+                
+                items = q.get("items", {})
+                for k in ["a", "b", "c", "d"]:
+                    item = items.get(k, {})
+                    is_true = item.get("correct", False)
+                    status_str = "ĐÚNG" if is_true else "SAI"
+                    
+                    p_item = doc.add_paragraph()
+                    p_item.paragraph_format.left_indent = Inches(0.2)
+                    p_item.paragraph_format.space_before = Pt(1)
+                    p_item.paragraph_format.space_after = Pt(2)
+                    p_item.paragraph_format.line_spacing = 1.15
+                    
+                    r_k = p_item.add_run(f"Ý {k}) [{status_str}]: ")
+                    r_k.bold = True
+                    r_k.font.color.rgb = RGBColor(4, 120, 87) if is_true else RGBColor(220, 38, 38)
+                        
+                    item_guide = item.get("guide", "").strip()
+                    if not item_guide:
+                        item_guide = item.get("content", "").strip()
+                    self._insert_formatted_text(p_item, item_guide)
+
+        # PHẦN III. LỜI GIẢI CÂU TRẮC NGHIỆM TRẢ LỜI NGẮN
+        if p3_list:
+            p_sol_p3 = doc.add_paragraph()
+            p_sol_p3.paragraph_format.space_before = Pt(14)
+            p_sol_p3.paragraph_format.space_after = Pt(4)
+            p_sol_p3.paragraph_format.keep_with_next = True
+            r = p_sol_p3.add_run(f"PHẦN III. LỜI GIẢI CÂU TRẮC NGHIỆM TRẢ LỜI NGẮN ({p3_pts_str} điểm)")
+            r.bold = True
+            r.font.size = Pt(12)
+            r.font.color.rgb = RGBColor(180, 83, 9)
+
+            for q in p3_list:
+                p_q = doc.add_paragraph()
+                p_q.paragraph_format.space_before = Pt(5)
+                p_q.paragraph_format.space_after = Pt(2)
+                p_q.paragraph_format.line_spacing = 1.15
+                r_num = p_q.add_run(f"Câu {q['num']}: Đáp án: {q.get('answer', '')}\n")
+                r_num.bold = True
+                r_num.font.color.rgb = RGBColor(180, 83, 9)
+                
+                guide = q.get("guide", "").strip()
+                if guide:
+                    self._insert_formatted_text(p_q, guide)
+
+        # PHẦN IV. LỜI GIẢI CHI TIẾT CÂU HỎI TỰ LUẬN
+        if p4_list:
+            p_sol_p4 = doc.add_paragraph()
+            p_sol_p4.paragraph_format.space_before = Pt(14)
+            p_sol_p4.paragraph_format.space_after = Pt(4)
+            p_sol_p4.paragraph_format.keep_with_next = True
+            r = p_sol_p4.add_run(f"PHẦN IV. LỜI GIẢI CHI TIẾT CÂU HỎI TỰ LUẬN ({p4_pts_str} điểm)")
+            r.bold = True
+            r.font.size = Pt(12)
+            r.font.color.rgb = RGBColor(109, 40, 217)
+
+            for q in p4_list:
+                p_q = doc.add_paragraph()
+                p_q.paragraph_format.space_before = Pt(5)
+                p_q.paragraph_format.space_after = Pt(2)
+                p_q.paragraph_format.line_spacing = 1.15
+                score_str = f" ({q.get('score', '1 điểm')}):" if q.get('score') else ":"
+                r_num = p_q.add_run(f"Câu {q['num']}{score_str}\n")
+                r_num.bold = True
+                r_num.font.color.rgb = RGBColor(109, 40, 217)
+                
+                guide = q.get("guide") or q.get("question") or ""
+                self._insert_formatted_text(p_q, guide)
 
         doc.save(file_path)

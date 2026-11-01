@@ -1611,6 +1611,39 @@ function renderResultsHub(data) {
         }
     }
 
+    // 4. Part IV Matrix (Tự luận)
+    const p4Container = document.getElementById("matrix-p4-container");
+    const p4Thead = document.getElementById("matrix-p4-thead");
+    const p4Tbody = document.getElementById("matrix-p4-tbody");
+    if (summary && summary.part4 && summary.part4.rows && summary.part4.rows.length > 0) {
+        if (p4Container) p4Container.classList.remove("hidden");
+        if (p4Thead && Array.isArray(codes) && codes.length > 0) {
+            p4Thead.innerHTML = `<tr><th class="p-2.5 border border-purple-900 w-24 text-center">Câu</th>${codes.map(c => `<th class="p-2.5 border border-purple-900">Mã ${c}</th>`).join('')}</tr>`;
+        }
+        if (p4Tbody && Array.isArray(codes)) {
+            p4Tbody.innerHTML = "";
+            summary.part4.rows.forEach((r, idx) => {
+                const tr = document.createElement("tr");
+                tr.className = (idx % 2 === 0) ? "bg-purple-50/30" : "bg-white";
+                tr.innerHTML = `
+                    <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">Câu ${r.question_num}</td>
+                    ${codes.map(c => {
+                        const val = r[c] || {};
+                        const guideText = (typeof val === 'object') ? (val.guide || val.question || '') : String(val || '');
+                        return `
+                            <td class="p-2 border border-slate-200 text-slate-800 text-xs">
+                                ${formatMathPreview(guideText)}
+                            </td>
+                        `;
+                    }).join('')}
+                `;
+                p4Tbody.appendChild(tr);
+            });
+        }
+    } else {
+        if (p4Container) p4Container.classList.add("hidden");
+    }
+
     lucide.createIcons();
     renderMathSafe(container);
 }

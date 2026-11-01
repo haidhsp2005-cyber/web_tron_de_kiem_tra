@@ -160,6 +160,56 @@ class ExcelExporter:
 
         self._auto_column_width(ws3)
 
+        # 4. SHEET PHẦN IV
+        p4_rows = self.summary.get("part4", {}).get("rows", [])
+        if p4_rows:
+            import re
+            ws4 = wb.create_sheet(title="Phần IV - Tự luận")
+            ws4.views.sheetView[0].showGridLines = True
+            
+            ws4.merge_cells("A1:E1")
+            ws4["A1"] = f"BẢNG ĐÁP ÁN & HƯỚNG DẪN CHẤM PHẦN IV - TỰ LUẬN (MÔN: {self.metadata.get('subject', 'KHTN').upper()})"
+            ws4["A1"].font = Font(name="Times New Roman", size=13, bold=True, color="6D28D9")
+            ws4["A1"].alignment = Alignment(horizontal="left", vertical="center")
+            
+            ws4.cell(row=3, column=1, value="Câu").font = font_header
+            ws4.cell(row=3, column=1).fill = PatternFill(start_color="6D28D9", end_color="6D28D9", fill_type="solid")
+            ws4.cell(row=3, column=1).alignment = align_center
+            ws4.cell(row=3, column=1).border = thin_border
+            
+            for col_idx, c in enumerate(codes, start=2):
+                cell = ws4.cell(row=3, column=col_idx, value=f"Mã {c}")
+                cell.font = font_header
+                cell.fill = PatternFill(start_color="6D28D9", end_color="6D28D9", fill_type="solid")
+                cell.alignment = align_center
+                cell.border = thin_border
+                
+            for row_idx, r_data in enumerate(p4_rows, start=4):
+                bg_color = "F5F3FF" if row_idx % 2 == 0 else "FFFFFF"
+                fill_row = PatternFill(start_color=bg_color, end_color=bg_color, fill_type="solid")
+                
+                c_num = ws4.cell(row=row_idx, column=1, value=f"Câu {r_data['question_num']}")
+                c_num.font = font_data_bold
+                c_num.fill = fill_row
+                c_num.alignment = align_center
+                c_num.border = thin_border
+                
+                for col_idx, c in enumerate(codes, start=2):
+                    val = r_data.get(c, "")
+                    if isinstance(val, dict):
+                        guide_text = val.get("guide") or val.get("question") or ""
+                    else:
+                        guide_text = str(val or "")
+                    
+                    clean_text = re.sub(r"<[^>]+>", " ", guide_text).strip()
+                    cell = ws4.cell(row=row_idx, column=col_idx, value=clean_text)
+                    cell.font = font_data
+                    cell.fill = fill_row
+                    cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+                    cell.border = thin_border
+
+            self._auto_column_width(ws4)
+
         # Remove default sheet if exists
         if default_sheet in wb.worksheets and len(wb.worksheets) > 1:
             wb.remove(default_sheet)
