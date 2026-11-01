@@ -156,6 +156,7 @@ class ExamShuffler:
         for new_idx, q in enumerate(p4_pool, start=1):
             variant["part4"].append({
                 "num": new_idx,
+                "score": q.get("score", ""),
                 "original_id": q.get("id"),
                 "original_num": q.get("original_num", new_idx),
                 "question": q.get("question", ""),

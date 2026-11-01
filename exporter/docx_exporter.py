@@ -1357,9 +1357,7 @@ class DocxExporter:
                     r_k.bold = True
                     r_k.font.color.rgb = RGBColor(4, 120, 87) if is_true else RGBColor(220, 38, 38)
                         
-                    item_guide = item.get("guide", "").strip()
-                    if not item_guide:
-                        item_guide = item.get("content", "").strip()
+                    item_guide = (item.get("guide") or item.get("text") or item.get("content") or "").strip()
                     self._insert_formatted_text(p_item, item_guide)
 
         # PHẦN III. LỜI GIẢI CÂU TRẮC NGHIỆM TRẢ LỜI NGẮN

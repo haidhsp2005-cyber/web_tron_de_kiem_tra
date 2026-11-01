@@ -858,7 +858,7 @@ class DocxParser:
             if (QUESTION_REGEX.search(next_text) or PART1_REGEX.search(next_text) or 
                 PART2_REGEX.search(next_text) or PART3_REGEX.search(next_text) or 
                 PART4_REGEX.search(next_text) or 
-                re.search(r"(BẢNG\s+ĐÁP\s+ÁN|HƯỚNG\s+DẪN\s+CHẤM|\-\-\-+\s*HẾT)", next_text, re.IGNORECASE)):
+                re.search(r"(BẢNG\s+ĐÁP\s+ÁN\s+(?:VÀ|&)?\s*(?:MA\s+TRẬN)?|\-\-\-+\s*HẾT)", next_text, re.IGNORECASE)):
                 break
             full_text += "<br>" + next_p["formatted_text"]
             clean_q_xmls.extend(next_p["xml_strings"])
@@ -866,11 +866,17 @@ class DocxParser:
                 images.extend(next_p["images"])
             idx += 1
 
+        # Extract score (e.g., "(1 điểm)")
+        score_m = re.search(r"\(([^)]*điểm[^)]*)\)", raw_text, re.IGNORECASE)
+        score_val = score_m.group(1).strip() if score_m else ""
+
         # Separate question and grading guide / answer if marked
         parts = re.split(r"((?:<br>|\n|^)\s*(?:Hướng\s*dẫn\s*chấm|HD\s*chấm|Lời\s*giải|HƯỚNG\s*DẪN\s*CHẤM|Đáp\s*án)\s*[:=\n])", full_text, flags=re.IGNORECASE)
         if len(parts) >= 3:
             q_part = parts[0].strip()
-            guide_part = "".join(parts[1:]).strip()
+            raw_guide = "".join(parts[1:]).strip()
+            guide_part = re.sub(r"^(?:<br>|\n|^)\s*(?:Hướng\s*dẫn\s*chấm|HD\s*chấm|Lời\s*giải|HƯỚNG\s*DẪN\s*CHẤM|Đáp\s*án)\s*[:=\n]\s*", "", raw_guide, flags=re.IGNORECASE).strip()
+            guide_part = re.sub(r"^(?:<br>|\n|\s)+", "", guide_part).strip()
         else:
             q_part = full_text
             guide_part = ""
@@ -878,7 +884,8 @@ class DocxParser:
         # Strip grading guide from clean_q_xmls so student exam NEVER contains solutions
         clean_q_xmls, removed_guide = strip_elements_suffix(clean_q_xmls, r"((?:^|\n|\s{2,}|\b)(?:Hướng\s*dẫn\s*chấm|HD\s*chấm|Lời\s*giải|HƯỚNG\s*DẪN\s*CHẤM|Đáp\s*án)\s*[\:\=\s\n])")
         if removed_guide and not guide_part:
-            guide_part = removed_guide.strip()
+            guide_part = re.sub(r"^(?:Hướng\s*dẫn\s*chấm|HD\s*chấm|Lời\s*giải|HƯỚNG\s*DẪN\s*CHẤM|Đáp\s*án)\s*[\:\=\s\n]\s*", "", removed_guide, flags=re.IGNORECASE).strip()
+            guide_part = re.sub(r"^(?:<br>|\n|\s)+", "", guide_part).strip()
 
         # Remove "Câu X (X điểm):"
         clean_q = re.sub(r"^\s*(Câu|Bài)\s+\d+(\s*\([^\)]+\))?[\.\:\-\s]+", "", q_part).strip()
@@ -888,7 +895,9 @@ class DocxParser:
 
         self.part4_questions.append({
             "id": len(self.part4_questions) + 1,
+            "num": len(self.part4_questions) + 1,
             "original_num": q_num,
+            "score": score_val,
             "question": clean_q,
             "guide": guide_part,
             "images": images,
