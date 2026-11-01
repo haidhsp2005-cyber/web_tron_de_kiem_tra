@@ -409,7 +409,8 @@ class DocxParser:
                 if text:
                     formatted_parts.append(text)
                     raw_text_part = re.sub(r"<br\s*/?>", "\n", text)
-                    raw_parts.append(re.sub(r"<[^>]+>", "", raw_text_part))
+                    # Only strip synthetic formatting tags (sub, sup) so user code like <head>, <b>, <td> is preserved
+                    raw_parts.append(re.sub(r"</?(?:sub|sup)\b[^>]*>", "", raw_text_part))
                 if is_red:
                     has_red = True
                 oxml_elements.append(child)
@@ -616,7 +617,7 @@ class DocxParser:
         curr_pos = 0
         for elem in p_data["oxml_elements"]:
             txt, is_red = extract_element_text_with_formatting(elem)
-            clean_t = re.sub(r"<[^>]+>", "", txt)
+            clean_t = re.sub(r"</?(?:sub|sup|br)\b[^>]*>", "", txt)
             start = curr_pos
             end = curr_pos + len(clean_t)
             elem_spans.append((start, end, is_red, elem, txt))
@@ -635,14 +636,21 @@ class DocxParser:
             # Check if any run overlapping [m_start, m_end] is red
             choice_is_red = False
             choice_xmls = []
+            can_use_xml = True
             for s, e, is_red, elem, fmt_txt in elem_spans:
                 # Check overlap between [s, e] and [m_start, m_end]
                 if max(s, m_start) < min(e, m_end):
                     if is_red:
                         choice_is_red = True
+                    # If run starts before or extends past this choice, it covers multiple choices
+                    if s < m_start or e > m_end:
+                        can_use_xml = False
                     choice_xmls.append(elem)
                     
-            c_clean_xmls = strip_elements_prefix(serialize_oxml_elements(choice_xmls), r"^\s*[A-D][\.\:\)]\s*")
+            if not can_use_xml:
+                c_clean_xmls = []
+            else:
+                c_clean_xmls = strip_elements_prefix(serialize_oxml_elements(choice_xmls), r"^\s*[A-D][\.\:\)]\s*")
             res[key] = {
                 "text": c_text_raw,
                 "is_red": choice_is_red,

@@ -628,7 +628,7 @@ class DocxExporter:
     def _insert_text_or_math(self, paragraph, text_snippet: str, is_red: bool = False):
         """Inserts text, OMML math formulas, and sub/sup tags into paragraph."""
         clean_str = str(text_snippet).replace("<br>", "\n").replace("<br/>", "\n")
-        clean_str = re.sub(r'</?(?:div|span|p|figure)[^>]*>', '', clean_str)
+        clean_str = re.sub(r'</?(?:div|span)\s+class="[^"]*"[^>]*>', '', clean_str)
         tokens = re.split(r"(\$[^\$]+\$|<sub>.*?</sub>|<sup>.*?</sup>)", clean_str, flags=re.IGNORECASE)
         for token in tokens:
             if not token:
@@ -699,9 +699,17 @@ class DocxExporter:
                 if is_red:
                     r.font.color.rgb = RED_COLOR
             else:
-                r = paragraph.add_run(token)
-                if is_red:
-                    r.font.color.rgb = RED_COLOR
+                lines = token.split("\n")
+                for l_idx, line in enumerate(lines):
+                    if l_idx > 0:
+                        paragraph.add_run().add_break()
+                    r = paragraph.add_run(line)
+                    if "  " in line or line.startswith(" ") or line.endswith(" "):
+                        t_elem = r._r.find(qn('w:t'))
+                        if t_elem is not None:
+                            t_elem.set(qn('xml:space'), 'preserve')
+                    if is_red:
+                        r.font.color.rgb = RED_COLOR
 
     def _insert_formatted_text(self, paragraph, html_text: str, is_red: bool = False):
         """Splits HTML into text, images, and tables, creating paragraphs, tables and images in exact order."""
