@@ -261,9 +261,13 @@ async def shuffle_exam(payload: dict = Body(...)):
         except Exception:
             pass
 
+        summary = shuffled_result.get("summary", {})
+        if "variants" not in summary:
+            summary["variants"] = summary.get("codes", [v["code"] for v in shuffled_result.get("variants", [])])
+
         return {
             "run_id": run_id,
-            "summary": shuffled_result["summary"],
+            "summary": summary,
             "variants_count": len(shuffled_result["variants"]),
             "downloads": download_links,
             "zip_base64": zip_b64

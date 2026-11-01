@@ -1495,104 +1495,120 @@ function renderResultsHub(data) {
     document.getElementById("download-summary-docx-btn").href = links.summary_docx;
 
     // Render Variant Cards
-    variantsGrid.innerHTML = "";
-    links.tests.forEach((t, idx) => {
-        const keyItem = links.keys[idx];
-        const card = document.createElement("div");
-        card.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3";
-        card.innerHTML = `
-            <div class="flex items-center justify-between">
-                <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-brand-50 text-brand-700 border border-brand-200">
-                    MÃ ĐỀ: ${t.code}
-                </span>
-                <span class="text-xs text-slate-400">Đề số ${idx + 1}</span>
-            </div>
-            <div class="space-y-1.5 pt-1">
-                <a href="${t.url}" download="${t.filename}" class="w-full inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm">
-                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-                    <span>Tải Đề Word (.docx)</span>
-                </a>
-                <a href="${keyItem.url}" download="${keyItem.filename}" class="w-full inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition">
-                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
-                    <span>Đáp Án & Lời Giải</span>
-                </a>
-            </div>
-        `;
-        variantsGrid.appendChild(card);
-    });
+    if (variantsGrid) {
+        variantsGrid.innerHTML = "";
+        if (links && Array.isArray(links.tests)) {
+            links.tests.forEach((t, idx) => {
+                const keyItem = (links.keys && links.keys[idx]) || { url: '#', filename: '' };
+                const card = document.createElement("div");
+                card.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-brand-50 text-brand-700 border border-brand-200">
+                            MÃ ĐỀ: ${t.code}
+                        </span>
+                        <span class="text-xs text-slate-400">Đề số ${idx + 1}</span>
+                    </div>
+                    <div class="space-y-1.5 pt-1">
+                        <a href="${t.url}" download="${t.filename}" class="w-full inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm">
+                            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                            <span>Tải Đề Word (.docx)</span>
+                        </a>
+                        <a href="${keyItem.url}" download="${keyItem.filename}" class="w-full inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition">
+                            <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                            <span>Đáp Án & Lời Giải</span>
+                        </a>
+                    </div>
+                `;
+                variantsGrid.appendChild(card);
+            });
+        }
+    }
 
     // Render Answer Matrix Tables
-    const codes = summary.variants;
+    const codes = (summary && (summary.codes || summary.variants)) || (links && Array.isArray(links.tests) ? links.tests.map(t => t.code) : []);
 
     // 1. Part I Matrix
     const p1Thead = document.getElementById("matrix-p1-thead");
     const p1Tbody = document.getElementById("matrix-p1-tbody");
-    p1Thead.innerHTML = `<tr><th class="p-2.5 border border-blue-900 w-16">Câu</th>${codes.map(c => `<th class="p-2.5 border border-blue-900">Mã ${c}</th>`).join('')}</tr>`;
+    if (p1Thead && Array.isArray(codes) && codes.length > 0) {
+        p1Thead.innerHTML = `<tr><th class="p-2.5 border border-blue-900 w-16">Câu</th>${codes.map(c => `<th class="p-2.5 border border-blue-900">Mã ${c}</th>`).join('')}</tr>`;
+    }
     
-    p1Tbody.innerHTML = "";
-    if (summary.part1 && summary.part1.rows) {
-        summary.part1.rows.forEach((r, idx) => {
-            const tr = document.createElement("tr");
-            tr.className = (idx % 2 === 0) ? "bg-blue-50/30" : "bg-white";
-            tr.innerHTML = `
-                <td class="p-2 border border-slate-200 font-bold text-slate-700">Câu ${r.question_num}</td>
-                ${codes.map(c => `
-                    <td class="p-2 border border-slate-200 font-bold ${r[c] ? 'text-brand-700 bg-brand-50/40' : 'text-slate-400'}">
-                        ${r[c] || '-'}
-                    </td>
-                `).join('')}
-            `;
-            p1Tbody.appendChild(tr);
-        });
+    if (p1Tbody) {
+        p1Tbody.innerHTML = "";
+        if (summary && summary.part1 && summary.part1.rows && Array.isArray(codes)) {
+            summary.part1.rows.forEach((r, idx) => {
+                const tr = document.createElement("tr");
+                tr.className = (idx % 2 === 0) ? "bg-blue-50/30" : "bg-white";
+                tr.innerHTML = `
+                    <td class="p-2 border border-slate-200 font-bold text-slate-700">Câu ${r.question_num}</td>
+                    ${codes.map(c => `
+                        <td class="p-2 border border-slate-200 font-bold ${r[c] ? 'text-brand-700 bg-brand-50/40' : 'text-slate-400'}">
+                            ${r[c] || '-'}
+                        </td>
+                    `).join('')}
+                `;
+                p1Tbody.appendChild(tr);
+            });
+        }
     }
 
     // 2. Part II Matrix
     const p2Thead = document.getElementById("matrix-p2-thead");
     const p2Tbody = document.getElementById("matrix-p2-tbody");
-    p2Thead.innerHTML = `<tr><th class="p-2.5 border border-emerald-900 w-28 text-left pl-4">Lệnh hỏi</th>${codes.map(c => `<th class="p-2.5 border border-emerald-900">Mã ${c}</th>`).join('')}</tr>`;
+    if (p2Thead && Array.isArray(codes) && codes.length > 0) {
+        p2Thead.innerHTML = `<tr><th class="p-2.5 border border-emerald-900 w-28 text-left pl-4">Lệnh hỏi</th>${codes.map(c => `<th class="p-2.5 border border-emerald-900">Mã ${c}</th>`).join('')}</tr>`;
+    }
     
-    p2Tbody.innerHTML = "";
-    if (summary.part2 && summary.part2.rows) {
-        summary.part2.rows.forEach((r, idx) => {
-            const tr = document.createElement("tr");
-            tr.className = (idx % 2 === 0) ? "bg-emerald-50/30" : "bg-white";
-            tr.innerHTML = `
-                <td class="p-2 border border-slate-200 font-bold text-slate-700 text-left pl-4">${r.label}</td>
-                ${codes.map(c => {
-                    const isTrue = (r[c] === 'Đ');
-                    return `
-                        <td class="p-2 border border-slate-200 font-bold ${isTrue ? 'text-emerald-700' : 'text-slate-500'}">
-                            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded ${isTrue ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
-                                ${r[c] || ''}
-                            </span>
-                        </td>
-                    `;
-                }).join('')}
-            `;
-            p2Tbody.appendChild(tr);
-        });
+    if (p2Tbody) {
+        p2Tbody.innerHTML = "";
+        if (summary && summary.part2 && summary.part2.rows && Array.isArray(codes)) {
+            summary.part2.rows.forEach((r, idx) => {
+                const tr = document.createElement("tr");
+                tr.className = (idx % 2 === 0) ? "bg-emerald-50/30" : "bg-white";
+                tr.innerHTML = `
+                    <td class="p-2 border border-slate-200 font-bold text-slate-700 text-left pl-4">${r.label}</td>
+                    ${codes.map(c => {
+                        const isTrue = (r[c] === 'Đ');
+                        return `
+                            <td class="p-2 border border-slate-200 font-bold ${isTrue ? 'text-emerald-700' : 'text-slate-500'}">
+                                <span class="inline-flex items-center justify-center px-2 py-0.5 rounded ${isTrue ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
+                                    ${r[c] || ''}
+                                </span>
+                            </td>
+                        `;
+                    }).join('')}
+                `;
+                p2Tbody.appendChild(tr);
+            });
+        }
     }
 
     // 3. Part III Matrix
     const p3Thead = document.getElementById("matrix-p3-thead");
     const p3Tbody = document.getElementById("matrix-p3-tbody");
-    p3Thead.innerHTML = `<tr><th class="p-2.5 border border-amber-900 w-24">Câu</th>${codes.map(c => `<th class="p-2.5 border border-amber-900">Mã ${c}</th>`).join('')}</tr>`;
+    if (p3Thead && Array.isArray(codes) && codes.length > 0) {
+        p3Thead.innerHTML = `<tr><th class="p-2.5 border border-amber-900 w-24">Câu</th>${codes.map(c => `<th class="p-2.5 border border-amber-900">Mã ${c}</th>`).join('')}</tr>`;
+    }
     
-    p3Tbody.innerHTML = "";
-    if (summary.part3 && summary.part3.rows) {
-        summary.part3.rows.forEach((r, idx) => {
-            const tr = document.createElement("tr");
-            tr.className = (idx % 2 === 0) ? "bg-amber-50/30" : "bg-white";
-            tr.innerHTML = `
-                <td class="p-2 border border-slate-200 font-bold text-slate-700">Câu ${r.question_num}</td>
-                ${codes.map(c => `
-                    <td class="p-2 border border-slate-200 text-amber-900 font-bold">
-                        ${r[c] || ''}
-                    </td>
-                `).join('')}
-            `;
-            p3Tbody.appendChild(tr);
-        });
+    if (p3Tbody) {
+        p3Tbody.innerHTML = "";
+        if (summary && summary.part3 && summary.part3.rows && Array.isArray(codes)) {
+            summary.part3.rows.forEach((r, idx) => {
+                const tr = document.createElement("tr");
+                tr.className = (idx % 2 === 0) ? "bg-amber-50/30" : "bg-white";
+                tr.innerHTML = `
+                    <td class="p-2 border border-slate-200 font-bold text-slate-700">Câu ${r.question_num}</td>
+                    ${codes.map(c => `
+                        <td class="p-2 border border-slate-200 text-amber-900 font-bold">
+                            ${r[c] || ''}
+                        </td>
+                    `).join('')}
+                `;
+                p3Tbody.appendChild(tr);
+            });
+        }
     }
 
     lucide.createIcons();

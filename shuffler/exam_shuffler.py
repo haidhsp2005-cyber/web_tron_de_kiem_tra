@@ -244,6 +244,7 @@ class ExamShuffler:
 
         return {
             "codes": codes,
+            "variants": codes,
             "part1": {
                 "rows": p1_matrix_rows,
                 "by_code": p1_by_code
