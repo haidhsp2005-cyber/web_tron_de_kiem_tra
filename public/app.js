@@ -1526,7 +1526,11 @@ function renderResultsHub(data) {
     }
 
     // Render Answer Matrix Tables
-    const codes = (summary && (summary.codes || summary.variants)) || (links && Array.isArray(links.tests) ? links.tests.map(t => t.code) : []);
+    const codes = (Array.isArray(summary?.codes) && summary.codes.length > 0)
+        ? summary.codes
+        : ((Array.isArray(summary?.variants) && summary.variants.length > 0)
+            ? summary.variants
+            : (Array.isArray(links?.tests) ? links.tests.map(t => t.code) : []));
 
     // 1. Part I Matrix
     const p1Thead = document.getElementById("matrix-p1-thead");
