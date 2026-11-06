@@ -334,46 +334,28 @@ class DocxExporter:
                 choice_xmls = q.get("choice_xmls", {})
                 correct_k = q["correct"]
                 
-                lengths = [len(re.sub(r"<[^>]+>", "", str(choices.get(k, "")))) for k in ["A", "B", "C", "D"]]
+                def _get_choice_display_len(c_val: str) -> int:
+                    s = str(c_val).strip()
+                    # Strip rich text formatting tags like <b>, <i>, <u>, <span>, but preserve HTML tag content like <br>, <h1>, <p>
+                    s_clean = re.sub(r"<\/?(b|i|u|strong|em|span|font|mark)(?:\s+[^>]*)?>", "", s, flags=re.IGNORECASE)
+                    return len(s_clean)
+
+                def _is_true_multiline_choice(c_val: str) -> bool:
+                    s = str(c_val).strip()
+                    # If choice is literally an HTML tag like <br>, <br/>, <p>, <h1>, <div>, etc. -> definitely NOT multiline
+                    if re.match(r"^<[a-zA-Z0-9_-]+(?:\s+[^>]*)?/?>$", s, re.IGNORECASE):
+                        return False
+                    # Check explicit newlines with actual content across multiple lines
+                    lines = [l.strip() for l in s.split("\n") if l.strip()]
+                    if len(lines) > 1:
+                        return True
+                    return False
+
+                lengths = [_get_choice_display_len(choices.get(k, "")) for k in ["A", "B", "C", "D"]]
                 max_len = max(lengths) if lengths else 0
-                has_newlines = any(('\n' in str(choices.get(k, '')) or '<br' in str(choices.get(k, ''))) for k in ["A", "B", "C", "D"])
+                has_newlines = any(_is_true_multiline_choice(choices.get(k, "")) for k in ["A", "B", "C", "D"])
 
-                if max_len <= 15 and not has_newlines and not any(choice_xmls.get(k) for k in ["A", "B", "C", "D"]):
-                    # Standard: 4 choices on 1 line (1x4 borderless table: A, B, C, D)
-                    tbl_c = doc.add_table(rows=1, cols=4)
-                    tbl_c.alignment = WD_TABLE_ALIGNMENT.CENTER
-                    tbl_c.autofit = False
-                    set_table_no_borders(tbl_c)
-
-                    r = tbl_c.rows[0]
-                    r._tr.get_or_add_trPr().append(parse_xml(f'<w:cantSplit {nsdecls("w")}/>'))
-
-                    cells_map = [
-                        (tbl_c.cell(0, 0), "A"),
-                        (tbl_c.cell(0, 1), "B"),
-                        (tbl_c.cell(0, 2), "C"),
-                        (tbl_c.cell(0, 3), "D"),
-                    ]
-                    for cell, k in cells_map:
-                        cell.width = Inches(1.675)
-                        cp = cell.paragraphs[0]
-                        cp.paragraph_format.space_before = Pt(1)
-                        cp.paragraph_format.space_after = Pt(2)
-                        cp.paragraph_format.line_spacing = 1.15
-                        is_corr = (k == correct_k and is_answer_key)
-                        r_k = cp.add_run(f"{k}. ")
-                        r_k.bold = True
-                        if is_corr:
-                            r_k.font.color.rgb = RED_COLOR
-                        self._append_elements_or_text(
-                            cp, 
-                            choice_xmls.get(k, []), 
-                            choices.get(k, ""), 
-                            is_red=is_corr, 
-                            strip_red=not is_answer_key,
-                            strip_bold=not is_answer_key
-                        )
-                elif max_len <= 55 and not has_newlines:
+                if max_len <= 55 and not has_newlines:
                     # Standard: 2 choices per line (2x2 borderless table: A & B on row 0; C & D on row 1)
                     tbl_c = doc.add_table(rows=2, cols=2)
                     tbl_c.alignment = WD_TABLE_ALIGNMENT.CENTER
