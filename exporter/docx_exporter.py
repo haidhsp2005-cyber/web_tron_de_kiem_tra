@@ -338,7 +338,42 @@ class DocxExporter:
                 max_len = max(lengths) if lengths else 0
                 has_newlines = any(('\n' in str(choices.get(k, '')) or '<br' in str(choices.get(k, ''))) for k in ["A", "B", "C", "D"])
 
-                if max_len <= 55 and not has_newlines:
+                if max_len <= 15 and not has_newlines and not any(choice_xmls.get(k) for k in ["A", "B", "C", "D"]):
+                    # Standard: 4 choices on 1 line (1x4 borderless table: A, B, C, D)
+                    tbl_c = doc.add_table(rows=1, cols=4)
+                    tbl_c.alignment = WD_TABLE_ALIGNMENT.CENTER
+                    tbl_c.autofit = False
+                    set_table_no_borders(tbl_c)
+
+                    r = tbl_c.rows[0]
+                    r._tr.get_or_add_trPr().append(parse_xml(f'<w:cantSplit {nsdecls("w")}/>'))
+
+                    cells_map = [
+                        (tbl_c.cell(0, 0), "A"),
+                        (tbl_c.cell(0, 1), "B"),
+                        (tbl_c.cell(0, 2), "C"),
+                        (tbl_c.cell(0, 3), "D"),
+                    ]
+                    for cell, k in cells_map:
+                        cell.width = Inches(1.675)
+                        cp = cell.paragraphs[0]
+                        cp.paragraph_format.space_before = Pt(1)
+                        cp.paragraph_format.space_after = Pt(2)
+                        cp.paragraph_format.line_spacing = 1.15
+                        is_corr = (k == correct_k and is_answer_key)
+                        r_k = cp.add_run(f"{k}. ")
+                        r_k.bold = True
+                        if is_corr:
+                            r_k.font.color.rgb = RED_COLOR
+                        self._append_elements_or_text(
+                            cp, 
+                            choice_xmls.get(k, []), 
+                            choices.get(k, ""), 
+                            is_red=is_corr, 
+                            strip_red=not is_answer_key,
+                            strip_bold=not is_answer_key
+                        )
+                elif max_len <= 55 and not has_newlines:
                     # Standard: 2 choices per line (2x2 borderless table: A & B on row 0; C & D on row 1)
                     tbl_c = doc.add_table(rows=2, cols=2)
                     tbl_c.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -375,21 +410,35 @@ class DocxExporter:
                             strip_bold=not is_answer_key
                         )
                 else:
-                    # 4 separate lines (each choice on its own line)
-                    for k in ["A", "B", "C", "D"]:
-                        p_c = doc.add_paragraph()
-                        p_c.paragraph_format.space_before = Pt(1)
-                        p_c.paragraph_format.space_after = Pt(1)
-                        p_c.paragraph_format.line_spacing = 1.15
-                        if k != "D":
-                            p_c.paragraph_format.keep_with_next = True
+                    # 4 separate lines: 4x1 borderless table matching 2x2 table's alignment and indentation exactly!
+                    tbl_c = doc.add_table(rows=4, cols=1)
+                    tbl_c.alignment = WD_TABLE_ALIGNMENT.CENTER
+                    tbl_c.autofit = False
+                    set_table_no_borders(tbl_c)
+
+                    for r in tbl_c.rows:
+                        trPr = r._tr.get_or_add_trPr()
+                        trPr.append(parse_xml(f'<w:cantSplit {nsdecls("w")}/>'))
+
+                    cells_map = [
+                        (tbl_c.cell(0, 0), "A"),
+                        (tbl_c.cell(1, 0), "B"),
+                        (tbl_c.cell(2, 0), "C"),
+                        (tbl_c.cell(3, 0), "D"),
+                    ]
+                    for cell, k in cells_map:
+                        cell.width = Inches(6.70)
+                        cp = cell.paragraphs[0]
+                        cp.paragraph_format.space_before = Pt(1)
+                        cp.paragraph_format.space_after = Pt(2)
+                        cp.paragraph_format.line_spacing = 1.15
                         is_corr = (k == correct_k and is_answer_key)
-                        r_k = p_c.add_run(f"{k}. ")
+                        r_k = cp.add_run(f"{k}. ")
                         r_k.bold = True
                         if is_corr:
                             r_k.font.color.rgb = RED_COLOR
                         self._append_elements_or_text(
-                            p_c, 
+                            cp, 
                             choice_xmls.get(k, []), 
                             choices.get(k, ""), 
                             is_red=is_corr, 
@@ -433,6 +482,7 @@ class DocxExporter:
                 for k in ["a", "b", "c", "d"]:
                     item = items.get(k, {})
                     p_item = doc.add_paragraph()
+                    p_item.paragraph_format.left_indent = Inches(0.20)
                     p_item.paragraph_format.space_before = Pt(1)
                     p_item.paragraph_format.space_after = Pt(1)
                     p_item.paragraph_format.line_spacing = 1.15
